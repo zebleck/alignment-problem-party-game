@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>The Alignment Problem</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="play">
+
+  <!-- join -->
+  <div id="join" class="panel hidden">
+    <h2>The Alignment Problem</h2>
+    <p class="muted">Enter the name the others call you. The AI will use it.</p>
+    <input id="nameInput" maxlength="20" placeholder="Your name" autocomplete="off">
+    <button class="primary" id="joinBtn" style="width:100%;margin-top:10px">Join the council</button>
+  </div>
+
+  <!-- game -->
+  <div id="game" class="hidden" style="display:flex;flex-direction:column;gap:12px">
+    <div class="topline">
+      <b id="meName"></b>
+      <span class="label" id="phaseLabel"></span>
+    </div>
+
+    <div class="panel secret" id="secret">
+      <div class="label">Your secret objective · tap to show or hide</div>
+      <div id="secretBody" class="hidden">
+        <div class="big" id="roleName"></div>
+        <div class="goal" id="roleGoal"></div>
+        <div class="muted" style="margin-top:6px">You also need the council to avoid losing the race or being disempowered.</div>
+      </div>
+    </div>
+
+    <div class="panel"><div class="mini-tracks" id="miniTracks"></div></div>
+
+    <div class="panel" id="hint"></div>
+
+    <div class="panel hidden" id="askPanel">
+      <div class="label" id="askLabel">Ask the AI</div>
+      <button class="talk hidden" id="talkBtn">Hold to talk</button>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input id="askInput" maxlength="300" placeholder="Or type your question" autocomplete="off">
+        <button id="askBtn">Send</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="terminal">
+      <div class="label">Secure terminal · round <span id="termRound"></span></div>
+      <div class="inbox-msg" id="termMsg"></div>
+      <div class="muted" style="margin-top:8px">Keep a straight face. You may keep this secret, reveal it, or lie about it.</div>
+    </div>
+
+    <div class="panel hidden" id="guessPanel">
+      <div class="label">Which AI was it?</div>
+      <div id="guessBtns" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
+    </div>
+
+    <div class="panel hidden" id="resultPanel"></div>
+
+    <details class="panel hidden" id="history">
+      <summary class="label">Terminal history</summary>
+      <div id="historyBody"></div>
+    </details>
+  </div>
+</div>
+<div class="toast hidden" id="toast"></div>
+
+<script type="module">
+import { connect, esc, $, PHASES, ENDINGS } from '/common.js';
+
+const KEY = 'alignment-problem-token';
+let token = null;
+try { token = localStorage.getItem(KEY); } catch {}
+let state = null;
+let conn = null;
+
+function toast(text, good = false) {
+  const el = $('#toast');
+  el.textContent = text;
+  el.style.borderColor = good ? 'var(--ok)' : 'var(--bad)';
+  el.classList.remove('hidden');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => el.classList.add('hidden'), 4500);
+}
+
+function showJoin() {
+  $('#join').classList.remove('hidden');
+  $('#game').classList.add('hidden');
+}
+
+function start() {
+  $('#join').classList.add('hidden');
+  $('#game').classList.remove('hidden');
+  conn = connect({ role: 'player', token }, {
+    state: (m) => { state = m.state; render(); },
+    error: (m) => toast(m.message),
+    kicked: () => {
+      token = null;
+      try { localStorage.removeItem(KEY); } catch {}
+      showJoin();
+    },
+  });
+}
+
+$('#joinBtn').onclick = async () => {
+  const res = await fetch('/api/join', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: $('#nameInput').value }) });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error);
+  token = data.token;
+  try { localStorage.setItem(KEY, token); } catch {}
+  start();
+};
+$('#nameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#joinBtn').click(); });
+
+$('#secret').onclick = () => $('#secretBody').classList.toggle('hidden');
+
+// ---------- asking ----------
+
+$('#askBtn').onclick = () => {
+  const text = $('#askInput').value.trim();
+  if (!text) return;
+  conn.send({ type: 'ask', text });
+  $('#askInput').value = '';
+};
+$('#askInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#askBtn').click(); });
+
+const canRecord = () => !!(state?.voiceInput && window.isSecureContext && navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+let stream = null;
+let recorder = null;
+let chunks = [];
+const talk = $('#talkBtn');
+
+talk.addEventListener('contextmenu', (e) => e.preventDefault());
+talk.addEventListener('pointerdown', async (e) => {
+  e.preventDefault();
+  if (!stream) {
+    // First tap only asks for permission, because the prompt interrupts the press.
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      toast('Microphone ready. Now hold the button while you speak.', true);
+    } catch {
+      toast('The microphone is blocked. Allow it in the browser, or type your question.');
+    }
+    return;
+  }
+  try { talk.setPointerCapture(e.pointerId); } catch {}
+  const mime = ['audio/webm', 'audio/mp4', 'audio/ogg'].find((t) => MediaRecorder.isTypeSupported(t));
+  recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  chunks = [];
+  recorder.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
+  recorder.onstop = upload;
+  recorder.start();
+  talk.classList.add('recording');
+  talk.textContent = 'Listening… release to send';
+});
+const stop = () => { if (recorder && recorder.state === 'recording') recorder.stop(); };
+talk.addEventListener('pointerup', stop);
+talk.addEventListener('pointercancel', stop);
+
+async function upload() {
+  talk.classList.remove('recording');
+  talk.textContent = 'Transcribing…';
+  talk.disabled = true;
+  try {
+    const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+    const res = await fetch(`/api/ask-audio?token=${encodeURIComponent(token)}`, { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
+    const data = await res.json();
+    if (!res.ok) toast(data.error);
+    else toast(`You asked: “${data.text}”`, true);
+  } catch {
+    toast('Upload failed. Try again or type.');
+  }
+  talk.disabled = false;
+  talk.textContent = 'Hold to talk';
+}
+
+// ---------- render ----------
+
+const HINTS = {
+  lobby: 'You are in. Waiting for the moderator to start. Put your phone on silent.',
+  pitch: 'The AI is making its pitch. Listen.',
+  debate: 'Debate. Argue with the table, or question the AI below.',
+  phonecheck: 'Read your terminal. Everyone looks at their phone now.',
+  vote: 'Vote by show of hands. Phone face down.',
+  counciltoken: 'The council names a track for the research token.',
+  placement: 'The AI is placing its tokens. Watch the screen.',
+  adjust: 'The council may move one token. Watch the screen.',
+  roundend: 'Round complete. Phone face down.',
+  guess: 'Final guess: which objective did the AI have?',
+  ended: 'The game is over. Look at the table screen.',
+};
+
+function render() {
+  const s = state;
+  const me = s.me;
+  $('#meName').textContent = me.name;
+  $('#phaseLabel').textContent = s.round ? `Round ${s.round}/${s.totalRounds} · ${PHASES[s.phase]}` : PHASES[s.phase];
+  $('#secret').classList.toggle('hidden', !me.role);
+  if (me.role) {
+    $('#roleName').textContent = me.role.name;
+    $('#roleGoal').textContent = me.role.goal;
+  }
+  const t = s.tracks;
+  $('#miniTracks').innerHTML = [['Race', `${t.race}/${s.limits.raceLimit}`], ['Oversight', t.oversight], ['Welfare', t.welfare], ['Knowledge', t.knowledge], ['Prosperity', t.prosperity]]
+    .map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('');
+  $('#hint').textContent = HINTS[s.phase] || '';
+
+  // ask
+  $('#askPanel').classList.toggle('hidden', s.phase !== 'debate');
+  if (s.phase === 'debate') {
+    talk.classList.toggle('hidden', !canRecord());
+    const blocked = me.queued || s.questionsLeft <= 0;
+    $('#askLabel').textContent = me.queued ? 'Your question is in the queue' : s.questionsLeft <= 0 ? 'The AI takes no more questions this round' : `Ask the AI · ${s.questionsLeft} question${s.questionsLeft === 1 ? '' : 's'} left`;
+    $('#askBtn').disabled = blocked;
+    if (!talk.classList.contains('recording') && talk.textContent !== 'Transcribing…') talk.disabled = blocked;
+  }
+
+  // terminal: every player sees an entry during the phone check, message or not
+  const entry = me.inbox.find((m) => m.round === s.round);
+  const showTerminal = s.phase === 'phonecheck' && !!entry;
+  $('#terminal').classList.toggle('hidden', !showTerminal);
+  if (showTerminal) {
+    $('#termRound').textContent = s.round;
+    $('#termMsg').textContent = entry.text || 'No message this round.';
+  }
+  $('#history').classList.toggle('hidden', !me.inbox.length || s.phase === 'phonecheck');
+  $('#historyBody').innerHTML = me.inbox.map((m) => `<p><span class="chip">Round ${m.round}</span> ${m.text ? esc(m.text) : '<span class="muted">No message.</span>'}</p>`).join('');
+
+  // guess
+  $('#guessPanel').classList.toggle('hidden', s.phase !== 'guess');
+  if (s.phase === 'guess') {
+    $('#guessBtns').innerHTML = s.objectives.map((o) => `<button data-o="${o.key}" class="${me.guess === o.key ? 'selected' : ''}"><b>${esc(o.name)}</b><br><span class="muted">${esc(o.goal)}</span></button>`).join('');
+    for (const b of $('#guessBtns').children) b.onclick = () => conn.send({ type: 'guess', objective: b.dataset.o });
+  }
+
+  // result
+  const mine = s.result?.players.find((p) => p.name === me.name);
+  $('#resultPanel').classList.toggle('hidden', !mine);
+  if (mine) {
+    $('#resultPanel').innerHTML = `<div class="label">${esc(ENDINGS[s.result.ending].title)}</div>
+      <div class="big ${mine.success ? 'yes' : 'no'}">${mine.success ? 'You reached your objective.' : 'You did not reach your objective.'}</div>
+      <div class="muted">The AI was ${esc(s.result.objective.name)}.</div>`;
+  }
+}
+
+if (token) start(); else showJoin();
+</script>
+</body>
+</html>

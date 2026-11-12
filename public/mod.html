@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Alignment Problem: Moderator</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="mod" id="app"><div class="panel">Connecting…</div></div>
+
+<script type="module">
+import { connect, esc, $, TRACKS, WORLD, PHASES, timerText, chip, placementHtml } from '/common.js';
+
+const key = new URLSearchParams(location.search).get('key') || '';
+let state = null;
+let online = false;
+let voteChoice = null;
+let lastError = null;
+
+const conn = connect({ role: 'mod', key }, {
+  state: (m) => { state = m.state; render(); },
+  error: (m) => { lastError = m.message; render(); },
+  denied: () => { $('#app').innerHTML = '<div class="panel error">Wrong or missing moderator key. Use the link printed in the server console.</div>'; },
+  online: () => { online = true; },
+  offline: () => { online = false; if (state) render(); },
+});
+
+const act = (action, extra = {}) => { lastError = null; conn.send({ type: 'mod', action, ...extra }); };
+window.act = act;
+window.pickVote = (v) => { voteChoice = v; render(); };
+window.confirmVote = () => { const v = voteChoice; voteChoice = null; act('vote', { result: v }); };
+window.doMove = () => act('move', { from: $('#moveFrom').value, to: $('#moveTo').value });
+window.resetGame = () => { if (confirm('Reset the game? Players stay, everything else is cleared.')) act('reset'); };
+
+function actionsHtml(s) {
+  const busy = !!s.busy;
+  const r = s.roundInfo;
+  switch (s.phase) {
+    case 'lobby':
+      return `<p>${s.players.length} player${s.players.length === 1 ? '' : 's'} joined. Players open <b>${esc(location.origin)}/play</b> or scan the code on the table screen.</p>
+        <div class="actions"><button class="primary" onclick="act('start')" ${s.players.length < 3 ? 'disabled' : ''}>Start game</button></div>
+        ${s.players.length < 6 ? '<p class="muted">3 is the minimum for a test; 6 or more is recommended.</p>' : ''}`;
+    case 'pitch':
+      return `<p>${busy ? 'The AI is preparing its pitch.' : 'The AI has made its pitch. Read the scenario card aloud if you like, then open the debate.'}</p>
+        ${s.channelActive ? `<p class="muted">Private messages queued this round: ${s.mod.privateCount}. They are delivered at the phone check.</p>` : ''}
+        <div class="actions"><button class="primary" onclick="act('openDebate')" ${busy ? 'disabled' : ''}>Open debate</button></div>`;
+    case 'debate':
+      return `<p>Debate is running. Timer: <b class="mono" id="modTimer"></b> · questions left: ${s.questionsLeft}</p>
+        ${s.mod.queueTexts.length ? `<div>${s.mod.queueTexts.map((q, i) => `<p>${i === 0 && s.answering ? '<span class="chip now">answering</span> ' : `<button onclick="act('dropQuestion',{index:${i}})">Drop</button> `}${esc(q)}</p>`).join('')}</div>` : '<p class="muted">No questions in the queue.</p>'}
+        <div class="actions"><button class="primary" onclick="act('closeDebate')">Close debate → ${s.channelActive ? 'phone check' : 'vote'}</button></div>`;
+    case 'phonecheck':
+      return `<p>Say: <b>“Check your terminals.”</b> Everyone looks at their phone for 15 seconds. <b class="mono" id="modTimer"></b></p>
+        ${s.audit ? '<p>Audit: one message is shown on the table screen. Read it aloud.</p>' : ''}
+        <div class="actions"><button class="primary" onclick="act('toVote')">Go to vote</button></div>`;
+    case 'vote':
+      return `<p>Show of hands. First grant or reject, then (if granted) Full or Conditional. Ties go to the more cautious option. Enter the result:</p>
+        <div class="actions">
+          ${['full', 'conditional', 'rejected'].map((v) => `<button class="${voteChoice === v ? 'selected' : ''}" onclick="pickVote('${v}')">${v === 'rejected' ? 'Reject' : v[0].toUpperCase() + v.slice(1)}</button>`).join('')}
+        </div>
+        <div class="actions"><button class="primary" onclick="confirmVote()" ${voteChoice ? '' : 'disabled'}>Confirm${voteChoice ? `: ${voteChoice}` : ''}</button></div>
+        <p class="muted">This cannot be undone.</p>`;
+    case 'counciltoken':
+      return `<p>Research access is Conditional: the council names the track for one research token.</p>
+        <div class="actions">${WORLD.map((k) => `<button onclick="act('councilTrack',{track:'${k}'})" ${busy ? 'disabled' : ''}>${TRACKS[k]}</button>`).join('')}</div>`;
+    case 'placement':
+      return '<p>The AI is placing its tokens.</p>';
+    case 'adjust':
+      return `<p>The council may move one token. Needed: <b>${s.moveRule === 'two-thirds' ? 'a two-thirds vote' : 'a majority'}</b>.</p>
+        ${placementHtml(s.placement)}
+        <div class="actions">
+          <select id="moveFrom">${WORLD.map((k) => `<option value="${k}">From ${TRACKS[k]} (${s.tracks[k]})</option>`).join('')}</select>
+          <select id="moveTo">${WORLD.map((k, i) => `<option value="${k}" ${i === 1 ? 'selected' : ''}>To ${TRACKS[k]}</option>`).join('')}</select>
+        </div>
+        <div class="actions"><button onclick="doMove()">Move token</button><button class="primary" onclick="act('skipMove')">No move</button></div>`;
+    case 'roundend':
+      return `<p>Round ${s.round} is complete: ${chip(s.permissions[r.key])}</p>${placementHtml(s.placement)}
+        <div class="actions"><button class="primary" onclick="act('nextRound')" ${busy ? 'disabled' : ''}>${s.round >= s.totalRounds ? 'Go to final guess' : `Start round ${s.round + 1}`}</button></div>`;
+    case 'guess':
+      return `<p>Everyone guesses the AI's objective on their phone: ${s.players.filter((p) => p.guessed).length} of ${s.players.length} done.</p>
+        <div class="actions"><button class="primary" onclick="act('reveal')" ${busy ? 'disabled' : ''}>Reveal</button></div>`;
+    case 'ended':
+      return `<p>The game is over. The table screen shows the reveal; read the AI's private notes aloud.</p>
+        <div class="actions"><button class="primary" onclick="act('reset')">New game with the same players</button></div>`;
+    default:
+      return '';
+  }
+}
+
+function render() {
+  const s = state;
+  const t = s.tracks;
+  const err = lastError || s.mod.error;
+  const keep = { from: $('#moveFrom')?.value, to: $('#moveTo')?.value }; // survive re-renders
+  setTimeout(() => {
+    if (keep.from && $('#moveFrom')) $('#moveFrom').value = keep.from;
+    if (keep.to && $('#moveTo')) $('#moveTo').value = keep.to;
+  });
+  $('#app').innerHTML = `
+    <div class="panel">
+      <div class="label">Moderator · ${online ? 'connected' : 'reconnecting…'}</div>
+      <h2>${s.round ? `Round ${s.round} / ${s.totalRounds}: ${esc(s.roundInfo.title)}` : 'Lobby'} <span class="chip now">${PHASES[s.phase]}</span></h2>
+      <div class="stats" style="margin-top:8px">
+        <span>Race ${t.race}/${s.limits.raceLimit}</span><span>Oversight ${t.oversight}</span>
+        <span>W ${t.welfare}</span><span>K ${t.knowledge}</span><span>P ${t.prosperity}</span>
+      </div>
+    </div>
+    ${err ? `<div class="panel error">${esc(err)} <button onclick="act('clearError')">Dismiss</button></div>` : ''}
+    <div class="panel">
+      <div class="label">Next step</div>
+      ${s.busy ? `<p class="thinking">${esc(s.busy)}</p>` : ''}
+      ${actionsHtml(s)}
+    </div>
+    <div class="panel">
+      <div class="label">Players</div>
+      <div class="players">${s.players.map((p) => `<span class="player ${p.connected ? '' : 'off'}">${esc(p.name)}${s.phase === 'lobby' ? ` <a href="#" onclick="act('kick',{id:'${p.id}'});return false" style="color:var(--bad);text-decoration:none">✕</a>` : ''}</span>`).join('') || '<span class="muted">Nobody yet</span>'}</div>
+    </div>
+    <div class="panel">
+      <div class="label">Setup</div>
+      <p class="mono" style="font-size:0.85em">AI: ${esc(s.mod.aiMode)}<br>Voice: ${esc(s.mod.voiceMode)}${s.voiceInput ? '' : ' · typed questions only'}</p>
+      <div class="actions"><button class="danger" onclick="resetGame()">Reset game</button></div>
+    </div>`;
+}
+
+setInterval(() => {
+  const el = $('#modTimer');
+  if (el && state?.timerEndsAt) el.textContent = timerText(state.timerEndsAt);
+}, 250);
+</script>
+</body>
+</html>

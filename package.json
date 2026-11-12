@@ -1,0 +1,15 @@
+{
+  "name": "alignment-problem",
+  "version": "0.3.0",
+  "description": "The Alignment Problem: a party game where a real LLM plays the AI",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/sim.js",
+    "check-keys": "node test/keys.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

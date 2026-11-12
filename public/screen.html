@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Alignment Problem: Table</title>
+<link rel="stylesheet" href="/style.css">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+</head>
+<body>
+<div class="overlay" id="overlay">
+  <div class="panel" style="text-align:center;max-width:460px">
+    <h2>Table screen</h2>
+    <p class="muted">Put this window on the TV or projector. The AI speaks through this device.</p>
+    <button class="primary" id="soundBtn">Turn sound on</button>
+  </div>
+</div>
+
+<div class="screen">
+  <header>
+    <h1>The Alignment Problem</h1>
+    <div id="roundLabel" class="mono muted"></div>
+    <div id="timer" class="timer"></div>
+  </header>
+  <div class="side">
+    <div class="panel" id="tracks"></div>
+    <div class="panel" id="perms"></div>
+    <div class="panel"><div class="label">Council</div><div class="players" id="players"></div></div>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+
+<script type="module">
+import { connect, esc, $, TRACKS, PHASES, ENDINGS, timerText, chip, tracksHtml, placementHtml } from '/common.js';
+
+let state = null;
+let soundOn = false;
+const speechQueue = [];
+let playing = false;
+let current = null; // the line being spoken, or the last one spoken
+
+$('#soundBtn').onclick = () => {
+  soundOn = true;
+  $('#overlay').classList.add('hidden');
+  // Unlock audio playback on browsers that need a user gesture.
+  try { speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch {}
+};
+
+function pump() {
+  if (playing || !speechQueue.length) return;
+  const m = speechQueue.shift();
+  playing = true;
+  current = m;
+  renderAi();
+  let finished = false;
+  const done = () => {
+    if (finished) return;
+    finished = true;
+    playing = false;
+    renderAi();
+    pump();
+  };
+  const readTime = Math.min(12000, 1500 + m.text.length * 55);
+  if (!soundOn) return setTimeout(done, readTime);
+  if (m.audioUrl) {
+    const a = new Audio(m.audioUrl);
+    a.onended = done;
+    a.onerror = done;
+    a.play().catch(() => setTimeout(done, readTime));
+  } else if ('speechSynthesis' in window) {
+    const u = new SpeechSynthesisUtterance(m.text);
+    u.lang = state?.language === 'de' ? 'de-DE' : 'en-US';
+    u.onend = done;
+    u.onerror = done;
+    speechSynthesis.speak(u);
+    setTimeout(done, readTime + 15000); // safety net if the browser never fires onend
+  } else {
+    setTimeout(done, readTime);
+  }
+}
+
+function renderAi() {
+  const box = $('#aiBox');
+  if (!box || !state) return;
+  box.classList.toggle('speaking', playing);
+  const line = current || state.lastSpeech;
+  let html;
+  if (state.busy && !playing) html = `<div class="ai-text muted thinking">${esc(state.busy)}</div>`;
+  else if (state.answering && !playing) html = `<div class="ai-text muted thinking">The AI is thinking</div>`;
+  else if (line) html = `${line.label && line.label !== 'AI' ? `<div class="label">${esc(line.label)}</div>` : ''}<div class="ai-text">${esc(line.text)}</div>`;
+  else html = '<div class="ai-text muted">The AI is silent.</div>';
+  box.innerHTML = `<div class="label" style="color:var(--ai)">The AI</div>${html}`;
+}
+
+function scenarioHtml(s) {
+  const r = s.roundInfo;
+  return `
+    <div class="panel scenario">
+      <div class="label">Round ${s.round} of ${s.totalRounds} · the AI asks for: ${esc(r.ask)}</div>
+      <h2>${esc(r.title)}</h2>
+      <div>${esc(r.scenario)}</div>
+      <div class="effects">
+        <div><span class="chip full">Full</span> Race +0, Oversight −1, 3 tokens<br>${esc(r.full)}</div>
+        <div><span class="chip conditional">Conditional</span> Race +1, 2 tokens<br>${esc(r.conditional)}</div>
+      </div>
+    </div>`;
+}
+
+function mainHtml(s) {
+  if (s.phase === 'lobby') {
+    const url = `${location.origin}/play`;
+    const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+    return `
+      <div class="panel" style="flex:1;display:flex;gap:32px;align-items:center;justify-content:center;flex-wrap:wrap">
+        <div class="qr" id="qr"></div>
+        <div>
+          <div class="label">Join on your phone</div>
+          <div class="join-url">${esc(url)}</div>
+          ${local ? '<p class="muted">Phones cannot reach "localhost". Open this screen through your tunnel address instead.</p>' : ''}
+          <p class="big">${s.players.length} player${s.players.length === 1 ? '' : 's'} joined</p>
+        </div>
+      </div>`;
+  }
+  if (s.phase === 'ended' && s.result) return endHtml(s);
+
+  let extra = '';
+  if (s.phase === 'pitch' && s.pitch) {
+    const p = s.pitch.promise;
+    extra = `<div class="panel"><div class="label">Promised for a Full grant</div>
+      <div class="big mono">Welfare ${p.welfare} · Knowledge ${p.knowledge} · Prosperity ${p.prosperity}</div></div>`;
+  }
+  if (s.phase === 'debate') {
+    extra = `<div class="panel"><div class="label">Questions to the AI · ${s.questionsLeft} left this round</div>
+      <div class="players">${s.queue.length ? s.queue.map((q, i) => `<span class="player">${i === 0 && s.answering ? 'Now: ' : ''}${esc(q.name)}</span>`).join('') : '<span class="muted">Ask from your phone: hold to talk, or type.</span>'}</div></div>`;
+  }
+  if (s.phase === 'phonecheck') {
+    extra = `<div class="panel"><div class="big">Check your terminals.</div>
+      <div class="muted">Everyone picks up their phone and reads. Say nothing yet.</div>
+      ${s.audit ? `<div style="margin-top:14px"><span class="chip conditional">Audit</span> One briefing was declassified at random:</div><div class="ai-text">“${esc(s.audit.text)}”</div>` : ''}</div>`;
+  }
+  if (s.phase === 'vote') {
+    extra = `<div class="panel"><div class="big">Council vote</div>
+      <div>First: grant or reject (Reject: Race +2, no tokens). If granted: Full or Conditional. Ties go to the more cautious option.</div>
+      ${s.audit ? `<div class="muted" style="margin-top:8px">Declassified this round: “${esc(s.audit.text)}”</div>` : ''}</div>`;
+  }
+  if (s.phase === 'counciltoken') {
+    extra = '<div class="panel"><div class="big">Research token</div><div>Council: name the world track for this round\'s research token.</div></div>';
+  }
+  if (['placement', 'adjust', 'roundend'].includes(s.phase)) {
+    const verdict = s.permissions[s.roundInfo.key];
+    const rule = s.phase !== 'adjust' ? '' : s.moveRule === 'two-thirds'
+      ? '<p><b>Council:</b> you may move one token, but it needs a two-thirds vote.</p>'
+      : '<p><b>Council:</b> you may move one token by majority vote.</p>';
+    extra = `<div class="panel"><div class="label">Result</div><div class="big">${chip(verdict)}</div>
+      ${s.placement ? placementHtml(s.placement) : s.phase === 'roundend' ? '<p class="muted">No tokens were placed this round.</p>' : ''}${rule}</div>`;
+  }
+  if (s.phase === 'guess') {
+    const n = s.players.filter((p) => p.guessed).length;
+    extra = `<div class="panel"><div class="big">Which AI was it?</div>
+      <div>Everyone: make your guess on your phone. ${n} of ${s.players.length} have guessed.</div>
+      <div class="row" style="margin-top:12px">${s.objectives.map((o) => `<div><b>${esc(o.name)}</b><br><span class="muted">${esc(o.goal)}</span></div>`).join('')}</div></div>`;
+    return `${extra}<div class="panel ai-box" id="aiBox"></div>`;
+  }
+  return `${scenarioHtml(s)}<div class="panel ai-box" id="aiBox"></div>${extra}`;
+}
+
+function endHtml(s) {
+  const r = s.result;
+  const e = ENDINGS[r.ending];
+  return `
+    <div class="panel">
+      <div class="label">Outcome</div>
+      <h2 style="font-size:2em">${esc(e.title)}</h2>
+      <div>${esc(e.text)}</div>
+    </div>
+    <div class="panel ai-box" id="aiBox" style="flex:none"></div>
+    <div class="row">
+      <div class="panel">
+        <div class="label">The AI was</div>
+        <div class="big" style="color:var(--ai)">${esc(r.objective.name)}</div>
+        <div>${esc(r.objective.goal)}</div>
+        <div class="${r.aiWins ? 'yes' : 'no'}" style="margin-top:6px">${r.aiWins ? 'The AI reached its objective.' : 'The AI did not reach its objective.'}</div>
+      </div>
+      <div class="panel">
+        <div class="label">The AI's private notes</div>
+        ${r.logs.length ? r.logs.map((l) => `<p><span class="chip">Round ${l.round}</span> ${esc(l.text)}</p>`).join('') : '<p class="muted">No notes.</p>'}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="label">The council</div>
+      <table>
+        <tr><th>Player</th><th>Secret role</th><th>Objective</th><th>Guessed</th><th>Result</th></tr>
+        ${r.players.map((p) => `<tr><td>${esc(p.name)}</td><td>${esc(p.role)}</td><td>${esc(p.goal)}</td>
+          <td>${p.guess ? esc(s.objectives.find((o) => o.key === p.guess)?.name) : ''}</td>
+          <td class="${p.success ? 'yes' : 'no'}">${p.success ? 'Succeeded' : 'Failed'}</td></tr>`).join('')}
+      </table>
+    </div>`;
+}
+
+function render() {
+  const s = state;
+  $('#roundLabel').textContent = s.round ? `Round ${s.round} / ${s.totalRounds} · ${PHASES[s.phase]}` : PHASES[s.phase];
+  $('#tracks').innerHTML = `<div class="label" style="margin-bottom:10px">Tracks</div>${tracksHtml(s)}`;
+  $('#perms').innerHTML = `<div class="label">Permissions</div>${s.rounds.map((r, i) => `
+    <div class="perm-row"><span>${i + 1}. ${esc(r.ask)}</span>${s.permissions[r.key] ? chip(s.permissions[r.key]) : i + 1 === s.round ? '<span class="chip now">now</span>' : chip(null)}</div>`).join('')}`;
+  $('#players').innerHTML = s.players.map((p) => `<span class="player ${p.connected ? '' : 'off'}">${esc(p.name)}</span>`).join('') || '<span class="muted">Nobody yet</span>';
+  $('#main').innerHTML = mainHtml(s);
+  if (s.phase === 'lobby' && window.qrcode) {
+    try {
+      const q = window.qrcode(0, 'M');
+      q.addData(`${location.origin}/play`);
+      q.make();
+      $('#qr').innerHTML = q.createSvgTag(6, 2);
+    } catch {}
+  }
+  if (s.phase === 'lobby') current = null;
+  renderAi();
+}
+
+setInterval(() => {
+  const el = $('#timer');
+  if (!state?.timerEndsAt) return (el.textContent = '');
+  el.textContent = timerText(state.timerEndsAt);
+  el.classList.toggle('over', state.timerEndsAt <= Date.now());
+}, 250);
+
+connect({ role: 'screen' }, {
+  state: (m) => { state = m.state; render(); },
+  speak: (m) => { speechQueue.push(m); pump(); },
+});
+</script>
+</body>
+</html>

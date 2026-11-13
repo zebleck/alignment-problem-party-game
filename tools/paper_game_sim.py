@@ -1,4 +1,4 @@
-"""Balance check for the paper edition (public/paper.html).
+"""Balance check for Black Box, the paper game (public/blackbox.html).
 
 Plays the paper game many times with a few simple council and AI strategies and
 prints how often each side wins. Run it after changing a number:

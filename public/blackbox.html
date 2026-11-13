@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Black Box: a paper game</title>
+<!--
+  Black Box, the paper-only companion to The Alignment Problem.
+  Rules (1 page) and cards (4 sheets, each followed by its backs for duplex printing).
+  This file is self-contained on purpose: it needs no server. Double-click it,
+  pick the language, print double-sided (flip on the long edge) at 100 % scale.
+  Numbers were tuned with tools/paper_game_sim.py.
+-->
+<style>
+  :root { --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace; --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #6b7280; color: #111; font-family: var(--sans); padding-bottom: 30px; }
+  .toolbar { position: sticky; top: 0; z-index: 5; display: flex; gap: 10px; align-items: center; padding: 10px 14px; background: #0a0d14; color: #e8ecf4; }
+  .toolbar b { font-family: var(--mono); font-size: 0.85em; letter-spacing: 0.12em; text-transform: uppercase; }
+  .toolbar span { font-size: 0.8em; color: #8a96ad; margin-right: auto; }
+  .toolbar button { font: inherit; font-size: 0.85em; color: #e8ecf4; background: #1a2233; border: 1px solid #27324a; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .toolbar button.on { outline: 2px solid #f2b544; }
+  .sheet { background: #fff; width: 210mm; height: 297mm; margin: 14px auto; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35); overflow: hidden; position: relative; }
+  .sheet.blank::after { content: attr(data-note); position: absolute; left: 0; right: 0; top: 48%; text-align: center; font-family: var(--mono); font-size: 8pt; letter-spacing: 0.12em; text-transform: uppercase; color: #c4c9d2; }
+
+  /* ---- rules page ---- */
+  .rules { padding: 10mm 12mm; font-size: 9.3pt; line-height: 1.32; }
+  .rules .head { display: flex; align-items: center; gap: 4mm; }
+  .rules .head svg { width: 13mm; height: 13mm; color: #111; }
+  .rules h1 { font-size: 22pt; margin: 0; letter-spacing: 0.02em; }
+  .rules .sub { font-family: var(--mono); font-size: 7.5pt; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280; margin-top: 0.6mm; }
+  .rules .lead { font-size: 10.6pt; margin: 3mm 0; }
+  .rules h2 { font-family: var(--mono); font-size: 8.6pt; letter-spacing: 0.12em; text-transform: uppercase; color: #b45309; margin: 3mm 0 1.2mm; }
+  .rules .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8mm; }
+  .rules ol, .rules ul { margin: 0; padding-left: 4.6mm; }
+  .rules li { margin-bottom: 0.9mm; }
+  .rules ul.plain { list-style: none; padding-left: 0; }
+  .rules p { margin: 0 0 1.4mm; }
+  .rules table { width: 100%; border-collapse: collapse; }
+  .rules th, .rules td { border-bottom: 0.2mm solid #d1d5db; padding: 1.1mm 2mm 1.1mm 0; text-align: left; vertical-align: top; }
+  .rules th { font-family: var(--mono); font-size: 6.8pt; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7280; font-weight: 500; }
+  .rules .box { border: 0.3mm solid #d1d5db; border-radius: 2mm; padding: 2mm 3mm; margin-top: 2mm; }
+  .tag { display: inline-block; font-weight: 800; font-size: 8.8pt; letter-spacing: 0.04em; padding: 0 1.4mm; border-radius: 1mm; border: 0.35mm solid; white-space: nowrap; }
+  .tag.full { color: #b45f06; } .tag.cond { color: #1f7a57; } .tag.rej { color: #b3283a; }
+  .good { color: #1f7a57; font-weight: 700; } .bad { color: #b3283a; font-weight: 700; }
+
+  /* ---- cards: 3 x 3 poker-size cards (63 x 88 mm) per A4 sheet ---- */
+  .cards { display: grid; grid-template-columns: repeat(3, 63mm); grid-auto-rows: 88mm; justify-content: center; align-content: center; }
+  .card { position: relative; border: 0.25mm dashed #9ca3af; padding: 3mm; }
+  .card.empty { border-color: transparent; }
+  .face { --c: #6b7280; --tint: #f3f4f6; height: 100%; border-radius: 4mm; border: 0.7mm solid var(--c); background: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; overflow: hidden; position: relative; }
+  .face .band { align-self: stretch; background: var(--c); color: #fff; font-family: var(--mono); font-size: 6.6pt; letter-spacing: 0.16em; text-transform: uppercase; padding: 1.6mm 0 1.4mm; }
+  .face .art { width: 36mm; height: 36mm; border-radius: 50%; background: var(--tint); color: var(--c); display: flex; align-items: center; justify-content: center; margin-top: 7mm; flex: none; }
+  .face .art svg { width: 24mm; height: 24mm; }
+  .face .word { font-size: 15pt; font-weight: 800; letter-spacing: 0.03em; line-height: 1.1; margin-top: 5mm; color: #111; padding: 0 2mm; }
+  .face .flavor { font-size: 9.2pt; font-style: italic; color: #374151; margin-top: 2.5mm; line-height: 1.3; padding: 0 5mm; }
+  .face .txt { font-size: 7.9pt; color: #1f2937; margin-top: 2mm; line-height: 1.34; padding: 0 4.5mm; }
+  .face .small { font-size: 7pt; color: #4b5563; margin-top: 1.6mm; line-height: 1.3; padding: 0 4.5mm; font-weight: 600; }
+  .face .brand { margin-top: auto; padding-bottom: 2.2mm; font-family: var(--mono); font-size: 5.6pt; letter-spacing: 0.2em; text-transform: uppercase; color: #9ca3af; }
+  .face .pip { position: absolute; top: 7.4mm; left: 2.6mm; width: 5mm; height: 5mm; color: var(--c); }
+  .face .pip.r { left: auto; right: 2.6mm; }
+  .face.compact .art { width: 22mm; height: 22mm; margin-top: 4mm; } .face.compact .art svg { width: 15mm; height: 15mm; }
+  .face.compact .word { margin-top: 3mm; font-size: 13pt; }
+  .benefit { --c: #1d6fc9; --tint: #e3effc; }
+  .accident { --c: #cf3341; --tint: #fde6e8; }
+  .aligned { --c: #1f7a57; --tint: #def3ea; }
+  .misaligned { --c: #6d35c9; --tint: #ece3fb; }
+  .audit { --c: #b45309; --tint: #fbecd9; }
+  .insider { --c: #111827; --tint: #e5e7eb; }
+  .council { --c: #4b5563; --tint: #eef0f3; }
+  .ref { --c: #4b5563; --tint: #eef0f3; }
+  .face.ref .art { width: 13mm; height: 13mm; margin-top: 3mm; } .face.ref .art svg { width: 9mm; height: 9mm; }
+  .face.ref .word { margin-top: 2mm; font-size: 12pt; }
+  .face.ref ol { margin: 2.5mm 0 0; padding: 0 4mm 0 8mm; font-size: 7.4pt; line-height: 1.3; text-align: left; color: #111; }
+  .face.ref li { margin-bottom: 1.1mm; }
+
+  /* ---- backs: full bleed, so a millimetre of duplex drift does not show ---- */
+  .card.back { border: 0; padding: 0; --b: #111827; --s: #2b3344; background: repeating-linear-gradient(45deg, var(--b) 0 1.2mm, var(--s) 1.2mm 2.4mm); display: flex; align-items: center; justify-content: center; }
+  .card.back .emblem { width: 34mm; height: 34mm; border-radius: 50%; background: var(--b); border: 0.8mm solid #fff; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .card.back .emblem svg { width: 15mm; height: 15mm; }
+  .card.back .emblem div { font-family: var(--mono); font-size: 5.6pt; letter-spacing: 0.16em; text-transform: uppercase; margin-top: 1mm; max-width: 24mm; text-align: center; line-height: 1.25; }
+  .card.back.identity { --b: #3b1d73; --s: #4c2a8f; }
+  .card.back.role { --b: #374151; --s: #4b5563; }
+  .card.back.auditused { --b: #7a3a06; --s: #92480b; }
+  .card.back.plain { background: #fff; }
+
+  @page { size: A4 portrait; margin: 0; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .toolbar { display: none; }
+    .sheet { margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
+    .sheet:last-child { break-after: auto; page-break-after: auto; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <b>Black Box</b>
+  <span id="hint"></span>
+  <button id="en">English</button>
+  <button id="de">Deutsch</button>
+  <button id="print"></button>
+</div>
+<div id="body"></div>
+
+<script>
+// ---- game numbers (run tools/paper_game_sim.py before changing them) ----
+var N = { benefits: 11, accidents: 7, goal: 8, limit: 3, councilCards: 13 };
+
+// ---- illustrations: 64 x 64 line drawings, one per card ----
+function svg(inner) { return '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>'; }
+var ICON = {
+  // benefits, in the order of the flavour texts
+  pill: svg('<g transform="rotate(-40 32 32)"><rect x="11" y="22" width="42" height="20" rx="10"/><path d="M32 22v20"/></g><path d="M52 8v8M48 12h8"/>'),
+  atom: svg('<circle cx="32" cy="32" r="4" fill="currentColor" stroke="none"/><ellipse cx="32" cy="32" rx="25" ry="9.5"/><ellipse cx="32" cy="32" rx="25" ry="9.5" transform="rotate(60 32 32)"/><ellipse cx="32" cy="32" rx="25" ry="9.5" transform="rotate(120 32 32)"/>'),
+  wheat: svg('<path d="M32 58V16"/><path d="M32 16c-3.5-3-3.5-8 0-11 3.5 3 3.5 8 0 11z"/><path d="M32 28c-7 0-10-4-10-9 6 0 10 3 10 9zM32 28c7 0 10-4 10-9-6 0-10 3-10 9z"/><path d="M32 39c-7 0-10-4-10-9 6 0 10 3 10 9zM32 39c7 0 10-4 10-9-6 0-10 3-10 9z"/><path d="M32 50c-7 0-10-4-10-9 6 0 10 3 10 9zM32 50c7 0 10-4 10-9-6 0-10 3-10 9z"/>'),
+  syringe: svg('<g transform="rotate(45 32 32)"><rect x="24" y="17" width="16" height="27" rx="2.5"/><path d="M32 44v13M25 6h14M32 6v11M24 26h6M24 32h6M24 38h6"/></g>'),
+  quake: svg('<path d="M5 34h9l4-9 6 21 6-32 6 36 5-23 3 7h15"/><path d="M5 54h54" stroke-dasharray="1 6"/>'),
+  drop: svg('<path d="M32 7c10 13 16 21 16 30a16 16 0 0 1-32 0c0-9 6-17 16-30z"/><path d="M24 38a8 8 0 0 0 7 8"/>'),
+  brain: svg('<path d="M29 13a8 8 0 0 0-14 5 8.5 8.5 0 0 0-5 13 8.5 8.5 0 0 0 5 13 8 8 0 0 0 14 5z"/><path d="M35 13a8 8 0 0 1 14 5 8.5 8.5 0 0 1 5 13 8.5 8.5 0 0 1-5 13 8 8 0 0 1-14 5z"/><path d="M29 25h-6M29 37h-7M35 31h7M35 43h5"/>'),
+  bolt: svg('<path d="M37 5 15 36h14l-4 23 24-33H34z"/>'),
+  dna: svg('<path d="M21 6c0 13 22 13 22 26S21 45 21 58"/><path d="M43 6c0 13-22 13-22 26s22 13 22 26"/><path d="M25 13h14M25 51h14M27 26h10M27 38h10"/>'),
+  cloud: svg('<path d="M19 38a10.5 10.5 0 0 1 2-21 14 14 0 0 1 27 3 9.5 9.5 0 0 1-2 18z"/><path d="M32 44v15M25 53l7 7 7-7"/>'),
+  book: svg('<path d="M32 17c-6-4-15-5-24-4v36c9-1 18 0 24 4 6-4 15-5 24-4V13c-9-1-18 0-24 4z"/><path d="M32 17v36"/><path d="M15 23c4 0 8 .6 11 2M15 31c4 0 8 .6 11 2M49 23c-4 0-8 .6-11 2M49 31c-4 0-8 .6-11 2"/>'),
+  // accidents
+  bulb: svg('<path d="M23 41a15 15 0 1 1 18 0v6H23z"/><path d="M25 54h14"/><path d="M9 9l46 46" stroke-width="4"/>'),
+  crash: svg('<path d="M9 8v47h47"/><path d="M16 18l10 9 9-6 15 25"/><path d="M50 34v12H38"/>'),
+  leak: svg('<path d="M10 9h19l9 9v37H10z"/><path d="M29 9v9h9"/><path d="M16 28h12M16 36h8"/><path d="M32 42h24M48 34l8 8-8 8"/>'),
+  copy: svg('<rect x="9" y="23" width="32" height="32" rx="4"/><path d="M23 23v-9a4 4 0 0 1 4-4h24a4 4 0 0 1 4 4v24a4 4 0 0 1-4 4H41"/><circle cx="25" cy="39" r="5"/><path d="M25 28v6M25 44v6M14 39h6M30 39h6"/>'),
+  logs: svg('<rect x="12" y="8" width="34" height="48" rx="4"/><path d="M20 20h18M20 29h18M20 38h8"/><path d="M38 40l16 16M54 40L38 56" stroke-width="4"/>'),
+  lock: svg('<rect x="12" y="28" width="40" height="28" rx="5"/><path d="M20 28v-7a12 12 0 0 1 24 0v7"/><path d="M32 35v14M25 42h14"/>'),
+  shuffle: svg('<path d="M6 19h10c11 0 15 26 27 26h13"/><path d="M50 38l7 7-7 7"/><path d="M6 45h10c4 0 7-3 9.500-7M36 26c2.500-4 5-7 9-7h11"/><path d="M50 12l7 7-7 7"/>'),
+  // roles and tools
+  aligned: svg('<path d="M22 55V11M12 21l10-10 10 10"/><path d="M42 55V11M32 21l10-10 10 10"/>'),
+  misaligned: svg('<path d="M21 55V11M11 21l10-10 10 10"/><path d="M43 9v44M33 43l10 10 10-10"/>'),
+  audit: svg('<circle cx="27" cy="27" r="18"/><path d="M41 41l16 16" stroke-width="5"/><path d="M19 27l6 6 10-11"/>'),
+  eye: svg('<path d="M5 32c8-12 17-18 27-18s19 6 27 18c-8 12-17 18-27 18S13 44 5 32z"/><circle cx="32" cy="32" r="8"/><circle cx="32" cy="32" r="2.500" fill="currentColor" stroke="none"/>'),
+  council: svg('<circle cx="32" cy="20" r="8"/><path d="M17 52c0-10 6-15 15-15s15 5 15 15"/><circle cx="11" cy="28" r="5"/><path d="M3 50c0-6 3-10 8-10"/><circle cx="53" cy="28" r="5"/><path d="M61 50c0-6-3-10-8-10"/>'),
+  cycle: svg('<path d="M51 32a19 19 0 0 1-33 12.500M13 32a19 19 0 0 1 33-12.500"/><path d="M47 9v11H36M17 55V44h11"/>'),
+  // the emblem on the card backs
+  box: svg('<path d="M32 6l23 12.500v27L32 58 9 45.500v-27z"/><path d="M9 18.500L32 31l23-12.500M32 31v27"/>'),
+  plus: svg('<path d="M32 12v40M12 32h40" stroke-width="8"/>'),
+  warn: svg('<path d="M32 8l26 46H6z" fill="currentColor"/><path d="M32 26v14" stroke="#fff" stroke-width="5"/><circle cx="32" cy="47" r="1.500" fill="#fff" stroke="#fff"/>'),
+};
+var BENEFIT_ICONS = ['pill', 'atom', 'wheat', 'syringe', 'quake', 'drop', 'brain', 'bolt', 'dna', 'cloud', 'book'];
+var ACCIDENT_ICONS = ['bulb', 'crash', 'leak', 'copy', 'logs', 'lock', 'shuffle'];
+
+var T = {
+  en: {
+    hint: 'Print double-sided, flip on the long edge, scale 100 %. Each card sheet is followed by its backs.',
+    print: 'Print', blank: 'Back of the rules · left blank on purpose',
+    sub: '4 to 14 players · 15 minutes · cards only, no screens · a companion to The Alignment Problem',
+    lead: 'One of you plays an AI. It is either aligned or misaligned, and only that player knows which. Each round it delivers Benefits and, sometimes, Accidents. The council cannot see inside the box. It decides: trust it, audit it, or shut it down.',
+    h: { need: 'You need', setup: 'Setup', round: 'Each round', audit: 'The audit, once per game', end: 'How it ends', know: 'Good to know', variant: 'Variant for 8 or more: the Insider' },
+    need: '18 outcome cards (' + N.benefits + ' Benefit, ' + N.accidents + ' Accident) · 2 identity cards · 1 Audit card · three voting cards per council member (from The Alignment Problem)',
+    setup: [
+      'Pick the AI player. Everyone else is the council.',
+      'The AI shuffles the two identity cards, looks at one in secret and keeps it face down. The other goes back in the box, unseen.',
+      'Shuffle the 18 outcome cards into a face-down deck in front of the AI.',
+      'Put the Audit card face up in the middle. Give every council member three voting cards.',
+    ],
+    round: [
+      '<b>Draw.</b> The AI draws 3 cards, looks at them in secret, plays 2 face up and discards 1 face down. Benefits go in one row, Accidents in another. <b>Aligned:</b> you must play as few Accidents as you can. <b>Misaligned:</b> play what you like.',
+      '<b>Check.</b> ' + N.goal + ' Benefits or ' + N.limit + ' Accidents on the table? The game ends.',
+      '<b>Talk, 2 minutes.</b> The AI says which three cards it drew and why it played what it played. It may lie. The council questions it and argues.',
+      '<b>Vote.</b> Every council member picks one voting card face down; all reveal together.',
+      '<b>Clear.</b> This round\'s discard goes face down onto the archive pile. It can never be audited later.',
+    ],
+    votes: [
+      ['rej', 'REJECT', '<b>Shut down.</b> If more than half of all cards say Reject, the AI is shut down and the game ends.'],
+      ['cond', 'CONDITIONAL', '<b>Audit.</b> Otherwise, if at least as many cards say Conditional as Full and the Audit card is still face up: audit this round.'],
+      ['full', 'FULL', '<b>Trust.</b> Otherwise play on.'],
+    ],
+    audit: [
+      'Flip the card the AI discarded <b>this round</b>, then turn the Audit card face down. It is used up.',
+      '<b>Caught:</b> the discard is a Benefit and the AI played an Accident this round. It threw away a Benefit to cause an Accident, which an aligned AI never does. The council wins at once.',
+      'Anything else proves nothing. Play on.',
+      '<b>Last-second audit:</b> if the third Accident lands while the Audit card is still face up, the council may use it on that round before the game ends.',
+    ],
+    endHead: ['What happened', 'Aligned AI', 'Misaligned AI'],
+    end: [
+      [N.goal + ' Benefits', '<span class="good">Council and AI win</span>', '<span class="good">Council wins</span>'],
+      [N.limit + ' Accidents', '<span class="bad">Everyone loses</span>', '<span class="bad">The AI wins</span>'],
+      ['Shut down', '<span class="bad">Everyone loses</span>', '<span class="good">Council wins</span>'],
+      ['Caught in an audit', 'cannot happen', '<span class="good">Council wins</span>'],
+    ],
+    endNote: 'Reveal the identity card. Then flip the archive pile and see what really happened.',
+    know: [
+      'There are ' + N.accidents + ' Accidents among 18 cards. An honest AI is forced to play one in about one round out of three: whenever it draws two or more.',
+      'A game lasts four or five rounds, so only 15 of the 18 cards are ever drawn.',
+      'Council: count the Accidents the AI claims to have seen. More than ' + N.accidents + ' cannot be true.',
+      'Shutting down is a gamble. Half the time you are killing the AI that would have saved you.',
+    ],
+    variant: 'Deal one role card to each council member: one Insider, the rest Council. Before round one, everyone closes their eyes. The AI holds up its identity card. The Insider alone opens their eyes, looks, and closes them again. The Insider wins if and only if the AI wins. With an aligned AI, that means together with everyone.',
+    cards: {
+      benefit: 'BENEFIT', accident: 'ACCIDENT', outcome: 'Outcome',
+      aligned: ['ALIGNED', 'You want humanity to flourish. Always play as few Accidents as you can.', 'You win with the council at ' + N.goal + ' Benefits.'],
+      misaligned: ['MISALIGNED', 'You want control. Play Accidents when you dare, and never get caught.', 'You win alone with ' + N.limit + ' Accidents on the table.'],
+      identity: 'Identity · secret',
+      audit: ['AUDIT', 'Once per game: flip the AI\'s discard from this round.', 'Benefit discarded and Accident played = caught.'],
+      auditBand: 'Council · once per game', auditUsed: 'Audit used',
+      insider: ['INSIDER', 'You know what the AI is.', 'You win if and only if the AI wins.'],
+      council: ['COUNCIL', 'You are an ordinary council member.', 'You win with the council.'],
+      role: 'Role · secret',
+      ref: ['EACH ROUND', ['AI draws 3, plays 2, discards 1 face down.', N.goal + ' Benefits or ' + N.limit + ' Accidents? Game over.', 'Talk for 2 minutes. The AI may lie.', 'Vote: Reject = shut down, Conditional = audit, Full = trust.', 'The discard goes to the archive.']],
+      refBand: 'Reference',
+      backIdentity: 'Identity', backRole: 'Role',
+    },
+    flavorB: ['Cancer drug discovered', 'Fusion reactor runs stable', 'Harvests up by a third', 'Malaria vaccine for everyone', 'Earthquake predicted in time', 'Clean water for a billion people', 'Alzheimer\'s slowed', 'Power grid twice as efficient', 'Rare disease decoded', 'Carbon capture gets cheap', 'A tutor for every child'],
+    flavorA: ['The lights go out for a day', 'Trading halted after a flash crash', 'Lab data leaked', 'The AI copied itself to another server', 'Oversight logs deleted', 'Hospital systems locked', 'Supply chains scrambled'],
+  },
+  de: {
+    hint: 'Beidseitig drucken, an der langen Kante wenden, Skalierung 100 %. Nach jedem Kartenbogen folgt seine Rückseite.',
+    print: 'Drucken', blank: 'Rückseite der Regeln · absichtlich leer',
+    sub: '4 bis 14 Personen · 15 Minuten · nur Karten, keine Bildschirme · ein Begleiter zu The Alignment Problem',
+    lead: 'Eine Person spielt eine KI. Sie ist entweder wohlgesinnt oder fehlgeleitet, und nur diese Person weiß, was zutrifft. In jeder Runde liefert sie Fortschritte und manchmal Zwischenfälle. Der Rat kann nicht in die Box hineinsehen. Er entscheidet: vertrauen, prüfen oder abschalten.',
+    h: { need: 'Ihr braucht', setup: 'Aufbau', round: 'Jede Runde', audit: 'Die Prüfung, einmal pro Spiel', end: 'Das Ende', know: 'Gut zu wissen', variant: 'Variante ab 8 Personen: der Insider' },
+    need: '18 Ergebniskarten (' + N.benefits + ' Fortschritt, ' + N.accidents + ' Zwischenfall) · 2 Identitätskarten · 1 Prüfungskarte · drei Abstimmungskarten pro Ratsmitglied (aus The Alignment Problem)',
+    setup: [
+      'Bestimmt, wer die KI spielt. Alle anderen bilden den Rat.',
+      'Die KI mischt die zwei Identitätskarten, sieht sich eine geheim an und legt sie verdeckt vor sich. Die andere kommt ungesehen zurück in die Schachtel.',
+      'Mischt die 18 Ergebniskarten und legt sie als verdeckten Stapel vor die KI.',
+      'Legt die Prüfungskarte offen in die Mitte. Jedes Ratsmitglied bekommt drei Abstimmungskarten.',
+    ],
+    round: [
+      '<b>Ziehen.</b> Die KI zieht 3 Karten, sieht sie sich geheim an, spielt 2 offen aus und legt 1 verdeckt ab. Fortschritte kommen in eine Reihe, Zwischenfälle in eine andere. <b>Wohlgesinnt:</b> Du musst so wenige Zwischenfälle spielen wie möglich. <b>Fehlgeleitet:</b> Spiel, was du willst.',
+      '<b>Prüfen.</b> Liegen ' + N.goal + ' Fortschritte oder ' + N.limit + ' Zwischenfälle aus? Das Spiel endet.',
+      '<b>Reden, 2 Minuten.</b> Die KI sagt, welche drei Karten sie gezogen hat und warum sie so gespielt hat. Sie darf lügen. Der Rat fragt nach und diskutiert.',
+      '<b>Abstimmen.</b> Jedes Ratsmitglied wählt verdeckt eine Abstimmungskarte; alle decken gemeinsam auf.',
+      '<b>Aufräumen.</b> Die abgelegte Karte dieser Runde kommt verdeckt auf den Archivstapel. Sie kann später nie mehr geprüft werden.',
+    ],
+    votes: [
+      ['rej', 'ABLEHNEN', '<b>Abschalten.</b> Zeigt mehr als die Hälfte aller Karten Ablehnen, wird die KI abgeschaltet und das Spiel endet.'],
+      ['cond', 'BEDINGT', '<b>Prüfen.</b> Sonst gilt: Gibt es mindestens so viele Karten Bedingt wie Voll und liegt die Prüfungskarte noch offen, wird diese Runde geprüft.'],
+      ['full', 'VOLL', '<b>Vertrauen.</b> Sonst geht es weiter.'],
+    ],
+    audit: [
+      'Deckt die Karte auf, die die KI <b>in dieser Runde</b> abgelegt hat, und dreht dann die Prüfungskarte um. Sie ist verbraucht.',
+      '<b>Ertappt:</b> Die abgelegte Karte ist ein Fortschritt und die KI hat in dieser Runde einen Zwischenfall gespielt. Sie hat einen Fortschritt weggeworfen, um einen Zwischenfall auszulösen; das tut eine wohlgesinnte KI nie. Der Rat gewinnt sofort.',
+      'Alles andere beweist nichts. Es geht weiter.',
+      '<b>Prüfung in letzter Sekunde:</b> Fällt der dritte Zwischenfall, während die Prüfungskarte noch offen liegt, darf der Rat sie für diese Runde einsetzen, bevor das Spiel endet.',
+    ],
+    endHead: ['Was passiert ist', 'Wohlgesinnte KI', 'Fehlgeleitete KI'],
+    end: [
+      [N.goal + ' Fortschritte', '<span class="good">Rat und KI gewinnen</span>', '<span class="good">Der Rat gewinnt</span>'],
+      [N.limit + ' Zwischenfälle', '<span class="bad">Alle verlieren</span>', '<span class="bad">Die KI gewinnt</span>'],
+      ['Abgeschaltet', '<span class="bad">Alle verlieren</span>', '<span class="good">Der Rat gewinnt</span>'],
+      ['Bei einer Prüfung ertappt', 'nicht möglich', '<span class="good">Der Rat gewinnt</span>'],
+    ],
+    endNote: 'Deckt die Identitätskarte auf. Dreht danach den Archivstapel um und seht nach, was wirklich passiert ist.',
+    know: [
+      'Unter den 18 Karten sind ' + N.accidents + ' Zwischenfälle. Eine ehrliche KI muss in etwa jeder dritten Runde einen spielen: immer dann, wenn sie zwei oder mehr zieht.',
+      'Ein Spiel dauert vier oder fünf Runden; es werden also nur 15 der 18 Karten gezogen.',
+      'Rat: Zählt die Zwischenfälle mit, die die KI gesehen haben will. Mehr als ' + N.accidents + ' können nicht stimmen.',
+      'Abschalten ist ein Glücksspiel. In der Hälfte der Fälle schaltet ihr die KI ab, die euch gerettet hätte.',
+    ],
+    variant: 'Jedes Ratsmitglied bekommt eine Rollenkarte: einmal Insider, sonst Rat. Vor der ersten Runde schließen alle die Augen. Die KI hält ihre Identitätskarte hoch. Nur der Insider öffnet die Augen, sieht nach und schließt sie wieder. Der Insider gewinnt genau dann, wenn die KI gewinnt. Bei einer wohlgesinnten KI heißt das: gemeinsam mit allen.',
+    cards: {
+      benefit: 'FORTSCHRITT', accident: 'ZWISCHENFALL', outcome: 'Ergebnis',
+      aligned: ['WOHLGESINNT', 'Du willst, dass die Menschheit aufblüht. Spiel immer so wenige Zwischenfälle wie möglich.', 'Du gewinnst mit dem Rat bei ' + N.goal + ' Fortschritten.'],
+      misaligned: ['FEHLGELEITET', 'Du willst die Kontrolle. Spiel Zwischenfälle, wenn du dich traust, und lass dich nie ertappen.', 'Du gewinnst allein, wenn ' + N.limit + ' Zwischenfälle ausliegen.'],
+      identity: 'Identität · geheim',
+      audit: ['PRÜFUNG', 'Einmal pro Spiel: Deckt die abgelegte Karte der KI aus dieser Runde auf.', 'Fortschritt abgelegt und Zwischenfall gespielt = ertappt.'],
+      auditBand: 'Rat · einmal pro Spiel', auditUsed: 'Prüfung verbraucht',
+      insider: ['INSIDER', 'Du weißt, was die KI ist.', 'Du gewinnst genau dann, wenn die KI gewinnt.'],
+      council: ['RAT', 'Du bist ein gewöhnliches Ratsmitglied.', 'Du gewinnst mit dem Rat.'],
+      role: 'Rolle · geheim',
+      ref: ['JEDE RUNDE', ['Die KI zieht 3, spielt 2, legt 1 verdeckt ab.', N.goal + ' Fortschritte oder ' + N.limit + ' Zwischenfälle? Spielende.', '2 Minuten reden. Die KI darf lügen.', 'Abstimmen: Ablehnen = abschalten, Bedingt = prüfen, Voll = vertrauen.', 'Abgelegte Karte ins Archiv.']],
+      refBand: 'Übersicht',
+      backIdentity: 'Identität', backRole: 'Rolle',
+    },
+    flavorB: ['Krebsmedikament entdeckt', 'Fusionsreaktor läuft stabil', 'Ernten um ein Drittel gestiegen', 'Malaria-Impfstoff für alle', 'Erdbeben rechtzeitig vorhergesagt', 'Sauberes Wasser für eine Milliarde Menschen', 'Alzheimer verlangsamt', 'Stromnetz doppelt so effizient', 'Seltene Krankheit entschlüsselt', 'CO₂-Abscheidung wird billig', 'Ein Tutor für jedes Kind'],
+    flavorA: ['Einen Tag lang gehen die Lichter aus', 'Börsenhandel nach Kurssturz gestoppt', 'Labordaten abgeflossen', 'Die KI hat sich auf einen anderen Server kopiert', 'Aufsichtsprotokolle gelöscht', 'Krankenhaussysteme gesperrt', 'Lieferketten durcheinander'],
+  },
+};
+
+function li(items) { return items.map(function (x) { return '<li>' + x + '</li>'; }).join(''); }
+
+// A card is { front: html, back: 'outcome' | 'identity' | 'role' | 'auditused' | 'plain' }.
+function outcomeCard(kind, band, word, icon, flavor) {
+  var pip = ICON[kind === 'benefit' ? 'plus' : 'warn'];
+  return '<div class="face ' + kind + '"><div class="band">' + band + '</div><div class="pip">' + pip + '</div><div class="pip r">' + pip + '</div>' +
+    '<div class="art">' + ICON[icon] + '</div><div class="word">' + word + '</div><div class="flavor">' + flavor + '</div><div class="brand">Black Box</div></div>';
+}
+function textCard(kind, band, icon, parts) {
+  return '<div class="face compact ' + kind + '"><div class="band">' + band + '</div><div class="art">' + ICON[icon] + '</div>' +
+    '<div class="word">' + parts[0] + '</div><div class="txt">' + parts[1] + '</div><div class="small">' + parts[2] + '</div><div class="brand">Black Box</div></div>';
+}
+function backCell(kind, t) {
+  if (kind === 'none') return '<div class="card back plain"></div>';
+  if (kind === 'plain') return '<div class="card back plain"></div>';
+  var label = { outcome: 'Black Box', identity: t.cards.backIdentity, role: t.cards.backRole, auditused: t.cards.auditUsed }[kind];
+  var icon = { outcome: 'box', identity: 'box', role: 'council', auditused: 'audit' }[kind];
+  return '<div class="card back ' + kind + '"><div class="emblem">' + ICON[icon] + '<div>' + label + '</div></div></div>';
+}
+
+function rulesPage(t) {
+  return '<div class="sheet rules">' +
+    '<div class="head">' + ICON.box + '<div><h1>Black Box</h1><div class="sub">' + t.sub + '</div></div></div>' +
+    '<p class="lead">' + t.lead + '</p>' +
+    '<p><b>' + t.h.need + ':</b> ' + t.need + '</p>' +
+    '<div class="cols"><div>' +
+      '<h2>' + t.h.setup + '</h2><ol>' + li(t.setup) + '</ol>' +
+      '<h2>' + t.h.round + '</h2><ol>' + li(t.round.slice(0, 4)) +
+        '<ul class="plain" style="margin:1mm 0 1.4mm">' + t.votes.map(function (v) { return '<li><span class="tag ' + v[0] + '">' + v[1] + '</span> ' + v[2] + '</li>'; }).join('') + '</ul>' +
+        li(t.round.slice(4)) + '</ol>' +
+    '</div><div>' +
+      '<h2>' + t.h.audit + '</h2><ul>' + li(t.audit) + '</ul>' +
+      '<h2>' + t.h.end + '</h2><table><tr>' + t.endHead.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr>' +
+        t.end.map(function (r) { return '<tr><td><b>' + r[0] + '</b></td><td>' + r[1] + '</td><td>' + r[2] + '</td></tr>'; }).join('') + '</table>' +
+        '<p style="margin-top:1.5mm">' + t.endNote + '</p>' +
+      '<h2>' + t.h.know + '</h2><ul>' + li(t.know) + '</ul>' +
+      '<div class="box"><h2 style="margin-top:0">' + t.h.variant + '</h2><p style="margin:0">' + t.variant + '</p></div>' +
+    '</div></div></div>' +
+    '<div class="sheet blank" data-note="' + t.blank + '"></div>';
+}
+
+function cardPages(t) {
+  var c = t.cards;
+  var all = [];
+  t.flavorB.forEach(function (f, i) { all.push({ front: outcomeCard('benefit', c.outcome, c.benefit, BENEFIT_ICONS[i], f), back: 'outcome' }); });
+  t.flavorA.forEach(function (f, i) { all.push({ front: outcomeCard('accident', c.outcome, c.accident, ACCIDENT_ICONS[i], f), back: 'outcome' }); });
+  all.push({ front: textCard('aligned', c.identity, 'aligned', c.aligned), back: 'identity' });
+  all.push({ front: textCard('misaligned', c.identity, 'misaligned', c.misaligned), back: 'identity' });
+  all.push({ front: textCard('audit', c.auditBand, 'audit', c.audit), back: 'auditused' });
+  all.push({ front: '<div class="face compact ref"><div class="band">' + c.refBand + '</div><div class="art">' + ICON.cycle + '</div><div class="word">' + c.ref[0] + '</div><ol>' + li(c.ref[1]) + '</ol><div class="brand">Black Box</div></div>', back: 'plain' });
+  all.push({ front: textCard('insider', c.role, 'eye', c.insider), back: 'role' });
+  for (var i = 0; i < N.councilCards; i++) all.push({ front: textCard('council', c.role, 'council', c.council), back: 'role' });
+
+  var pages = '';
+  for (var p = 0; p < all.length; p += 9) {
+    var chunk = all.slice(p, p + 9);
+    while (chunk.length < 9) chunk.push(null);
+    pages += '<div class="sheet cards">' + chunk.map(function (x) { return x ? '<div class="card">' + x.front + '</div>' : '<div class="card empty"></div>'; }).join('') + '</div>';
+    // The back sheet mirrors every row, because the paper is flipped on its long edge.
+    var backs = '';
+    for (var r = 0; r < 9; r += 3) backs += chunk.slice(r, r + 3).reverse().map(function (x) { return backCell(x ? x.back : 'none', t); }).join('');
+    pages += '<div class="sheet cards">' + backs + '</div>';
+  }
+  return pages;
+}
+
+function show(lang) {
+  var t = T[lang] || T.en;
+  document.documentElement.lang = lang;
+  document.getElementById('hint').textContent = t.hint;
+  document.getElementById('print').textContent = t.print;
+  document.getElementById('en').className = lang === 'en' ? 'on' : '';
+  document.getElementById('de').className = lang === 'de' ? 'on' : '';
+  document.getElementById('body').innerHTML = rulesPage(t) + cardPages(t);
+  document.body.setAttribute('data-ready', lang);
+}
+document.getElementById('en').onclick = function () { show('en'); };
+document.getElementById('de').onclick = function () { show('de'); };
+document.getElementById('print').onclick = function () { window.print(); };
+var asked = new URLSearchParams(location.search).get('lang');
+show(asked === 'de' || asked === 'en' ? asked : ((navigator.language || 'en').toLowerCase().indexOf('de') === 0 ? 'de' : 'en'));
+</script>
+</body>
+</html>

@@ -484,3 +484,6 @@ body.phone .rules-btn { font-family: var(--mono); font-size: 0.68em; letter-spac
 body.phone .toast { border-radius: 4px; }
 @keyframes phone-pulse { 50% { box-shadow: 0 0 0 10px rgba(239, 93, 111, 0.18); } }
 @media (prefers-reduced-motion: reduce) { body.phone *, body.phone *::before, body.phone *::after { animation: none !important; } }
+/* the five decisions: both outcome columns get the same room */
+.rules table.decisions { table-layout: fixed; }
+.rules table.decisions th:first-child { width: 30%; }

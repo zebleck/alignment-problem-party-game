@@ -9,7 +9,8 @@
     "test": "node test/sim.js",
     "check-keys": "node test/keys.mjs",
     "fresh": "node server.js --fresh",
-    "tunnel": "node tunnel.js"
+    "tunnel": "node tunnel.js",
+    "pdfs": "node tools/make_pdfs.mjs"
   },
   "dependencies": {
     "qrcode-terminal": "^0.12.0",

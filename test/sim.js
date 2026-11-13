@@ -182,7 +182,7 @@ async function playDirect({ objective, votes, players = 8, move = false }) {
     act('openDebate');
     await phase('debate');
     players[1].send({ type: 'ask', text: 'What will you do with autonomy?' });
-    await until(() => mod.state.questionsLeft === 4 && !mod.state.answering, 'question answered');
+    await until(() => mod.state.questionsLeft === 2 && !mod.state.answering, 'question answered');
     act('closeDebate');
     if (round >= 4) {
       await phase('phonecheck');
@@ -425,7 +425,8 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   const os = await import('node:os');
   const path = await import('node:path');
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-')), 'state.json');
-  const app1 = createApp({ MOD_KEY: 'a', FORCE_OBJECTIVE: 'optimizer' }, { stateFile: file });
+  const gamesDir = path.join(path.dirname(file), 'games');
+  const app1 = createApp({ MOD_KEY: 'a', FORCE_OBJECTIVE: 'optimizer' }, { stateFile: file, gamesDir });
   await app1.ready;
   const tokens = ['Anna', 'Jonas', 'Mira'].map((n) => app1.game.addPlayer(n).token);
   await app1.game.start();
@@ -434,6 +435,14 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   await sleep(30); // let the save run
   assert.ok(fs.existsSync(file));
   const before = JSON.parse(JSON.stringify(app1.game.tracks));
+  // Every game also leaves a record that outlives a reset.
+  const id = app1.game.gameId;
+  const record = () => JSON.parse(fs.readFileSync(path.join(gamesDir, `${id}.json`), 'utf8'));
+  assert.equal(record().aiObjective, 'optimizer');
+  assert.equal(record().finished, false);
+  assert.equal(record().permissions.research, 'full');
+  assert.ok(record().history.some((h) => h.kind === 'vote'));
+  assert.match(fs.readFileSync(path.join(gamesDir, `${id}.md`), 'utf8'), /## Round 1[\s\S]*vote: The council voted: FULL/);
 
   const app2 = createApp({ MOD_KEY: 'a' }, { stateFile: file });
   await app2.ready;

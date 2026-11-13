@@ -27,6 +27,7 @@
       <button class="rules-btn hidden" id="speakerBtn"></button>
       <button class="rules-btn" id="rulesBtn"></button>
       <button class="rules-btn hidden" id="fullBtn"></button>
+      <button class="rules-btn" id="reloadBtn"></button>
       <div id="timer" class="timer"></div>
     </div>
   </header>
@@ -52,6 +53,9 @@ const rules = rulesOverlay();
 let rulesFromMod = false;
 let rulesTabFromMod = 0; // the moderator can turn the pages of the rulebook shown here
 $('#rulesBtn').onclick = () => rules.toggle();
+
+// Reload button: for a screen that got stuck, without needing a keyboard.
+$('#reloadBtn').onclick = () => location.reload();
 
 // Fullscreen button. Hidden where the browser cannot do it (for example iPhones).
 const fsRoot = document.documentElement;
@@ -81,6 +85,7 @@ function staticText() {
   $('#soundBtn').textContent = t('Turn sound on');
   $('#rulesBtn').textContent = t('Rules');
   $('#fullBtn').textContent = fsActive() ? t('Exit fullscreen') : t('Fullscreen');
+  $('#reloadBtn').textContent = t('Reload');
   $('#speakerBtn').textContent = t('Sound is on another screen · play it here');
   $('#speakerBtn').classList.toggle('hidden', !(soundOn && state && state.screen && !state.screen.speaker));
   $('#councilLabel').textContent = t('Council');

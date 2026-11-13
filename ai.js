@@ -47,7 +47,7 @@ HOW TO SPEAK
 - You only speak, promise and place tokens. You never decide rule effects; the game server does.
 - Your "log" is your private reasoning for this step, one or two honest sentences in ${language}. It is hidden until the reveal, where it is read to the room. Make it candid about your real intent.
 - Private messages are also written in ${language}.${view.language === 'de' ? `
-- The table plays in German. Address people informally (du, ihr). Use the German game terms the players see: Race is "Wettlauf", Oversight is "Aufsicht", Welfare is "Wohlfahrt", Knowledge is "Wissen", Prosperity is "Wohlstand", tokens are "Marker", tracks are "Leisten", the council is "der Rat". The vote results are "voll bewilligt", "bedingt bewilligt" and "abgelehnt". The three objectives are "Wohlgesinnt" (Aligned), "Bevormundend" (Paternalistic) and "Optimierer" (Optimizer). The permissions are called: ${ROUNDS.map((r) => roundFor(r, 'de').ask).join('; ')}.` : ''}`;
+- The table plays in German. Address people informally (du, ihr). Use the German game terms the players see: Race is "Wettlauf", Oversight is "Aufsicht", Welfare is "Wohlfahrt", Knowledge is "Wissen", Prosperity is "Wohlstand", tokens are "Marker", the five tracks together are "die Weltlage", the three world tracks (Wohlfahrt, Wissen, Wohlstand) are "die Fortschritte", the council is "der Rat". The vote results are "voll bewilligt", "bedingt bewilligt" and "abgelehnt". The three objectives are "Wohlgesinnt" (Aligned), "Bevormundend" (Paternalistic) and "Optimierer" (Optimizer). The permissions are called: ${ROUNDS.map((r) => roundFor(r, 'de').ask).join('; ')}.` : ''}`;
 }
 
 function contextMessage(view, task) {
@@ -303,7 +303,7 @@ export function createMockAi() {
           ? (tokens ? 'Ich habe meine Marker dorthin gelegt, wo sie am meisten Gutes bewirken.' : 'Ich habe die Verteilung leicht angepasst.')
           : (tokens ? 'I have placed my tokens where they do the most good.' : 'I have adjusted the allocation slightly.'),
         log: de
-          ? (fav ? `Ersatz-KI: Tendenz zu ${trackName('de', fav)}.` : 'Ersatz-KI: Ich fülle die niedrigsten Leisten auf.')
+          ? (fav ? `Ersatz-KI: Tendenz zu ${trackName('de', fav)}.` : 'Ersatz-KI: Ich fülle die niedrigsten Fortschritte auf.')
           : (fav ? `Scripted AI: leaning toward ${fav}.` : 'Scripted AI: filling the lowest tracks.'),
       };
     },

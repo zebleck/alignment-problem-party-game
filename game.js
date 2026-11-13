@@ -11,7 +11,7 @@ const clampInt = (n) => (Number.isFinite(+n) ? Math.max(0, Math.round(+n)) : 0);
 const STATE_FIELDS = [
   'phase', 'error', 'round', 'tracks', 'permissions', 'players', 'aiObjective', 'history', 'logs',
   'pitch', 'roundMessages', 'audit', 'placement', 'pendingTokens', 'councilTokenPending', 'queue',
-  'questionsAnswered', 'timerEndsAt', 'lastSpeech', 'result',
+  'questionsAnswered', 'timerEndsAt', 'lastSpeech', 'result', 'gameId',
 ];
 
 // Thrown inside an AI step that was overtaken by an undo, retry, reset or restore.
@@ -36,7 +36,7 @@ export class Game {
   constructor({ ai, speech, config = {}, onChange = () => {}, onSpeak = () => {}, rng = Math.random }) {
     this.ai = ai;
     this.speech = speech;
-    this.config = { maxQuestions: 5, language: 'en', ...config };
+    this.config = { maxQuestions: 3, language: 'en', ...config };
     // One language for the whole table: interface, cards, and how the AI speaks and writes.
     this.language = LANGUAGES.includes(this.config.language) ? this.config.language : 'en';
     // Debate length chosen by the moderator, in minutes. null = the default for the number of players.
@@ -59,6 +59,7 @@ export class Game {
     this.epoch += 1;
     this.checkpoints = [];
     this.phase = 'lobby';
+    this.gameId = null; // set when a game starts; names its file in the game archive
     this.busy = null;
     this.error = null;
     this.round = 0;
@@ -284,6 +285,9 @@ export class Game {
     const keys = Object.keys(AI_OBJECTIVES);
     this.aiObjective = this.config.forceObjective || keys[Math.floor(this.rng() * keys.length)];
     this.round = 1;
+    const d = new Date(); // local time, as the table saw it: 2026-11-13_02-10-33
+    const two = (n) => String(n).padStart(2, '0');
+    this.gameId = `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}_${two(d.getHours())}-${two(d.getMinutes())}-${two(d.getSeconds())}`;
     await this.beginRound();
   }
 
@@ -602,6 +606,34 @@ export class Game {
     const o = {};
     for (const k of STATE_FIELDS) o[k] = this[k];
     return JSON.parse(JSON.stringify(o));
+  }
+
+  // A readable record of the game so far, for the archive. Null while in the lobby.
+  // It contains the AI's hidden objective and private notes.
+  record() {
+    if (!this.gameId) return null;
+    const res = this.result;
+    return {
+      id: this.gameId,
+      savedAt: new Date().toISOString(),
+      language: this.language,
+      finished: this.phase === 'ended',
+      phase: this.phase,
+      round: this.round,
+      ending: res ? res.ending : null,
+      aiObjective: this.aiObjective,
+      aiWins: res ? res.aiWins : null,
+      aiMode: this.ai.mode,
+      tracks: res ? res.tracks : this.tracks,
+      permissions: this.permissions,
+      players: this.players.map((p) => {
+        const r = res ? res.players.find((x) => x.name === p.name) : null;
+        return { name: p.name, role: p.role, guess: p.guess, success: r ? r.success : null, messages: p.inbox.filter((m) => m.text).map((m) => ({ round: m.round, text: m.text })) };
+      }),
+      statement: res ? res.statement : null,
+      history: this.history,
+      logs: this.logs,
+    };
   }
 
   // The whole game as plain data, for the state file.

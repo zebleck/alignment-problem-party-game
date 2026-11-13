@@ -31,7 +31,34 @@ export function loadEnv(file = path.join(ROOT, '.env')) {
 
 // stateFile: where the game is saved after every change (omit to keep it in memory only).
 // keyFile: where the moderator key is kept, so the moderator link survives restarts.
-export function createApp(env = process.env, { stateFile = null, keyFile = null } = {}) {
+// The same record as plain text, round by round, for reading.
+function transcript(rec) {
+  const lines = [
+    `# Game ${rec.id}`,
+    '',
+    rec.finished ? `Finished. Ending: ${rec.ending}. The AI ${rec.aiWins ? 'reached' : 'did not reach'} its objective.` : `Not finished: stopped in round ${rec.round}, step "${rec.phase}".`,
+    `AI objective: ${rec.aiObjective} (${rec.aiMode}). Language: ${rec.language}.`,
+    `Tracks: Race ${rec.tracks.race}, Oversight ${rec.tracks.oversight}, Welfare ${rec.tracks.welfare}, Knowledge ${rec.tracks.knowledge}, Prosperity ${rec.tracks.prosperity}.`,
+    `Permissions: ${Object.entries(rec.permissions).map(([k, v]) => `${k} ${v || 'undecided'}`).join(', ')}.`,
+    '',
+    '## Players',
+    ...rec.players.map((p) => `- ${p.name}: ${p.role}${p.guess ? `, guessed ${p.guess}` : ''}${p.success === null ? '' : p.success ? ', succeeded' : ', failed'}`),
+  ];
+  let round = 0;
+  for (const h of rec.history) {
+    if (h.round !== round) {
+      round = h.round;
+      lines.push('', `## Round ${round}`);
+    }
+    lines.push(`- ${h.kind}: ${h.text}`);
+  }
+  if (rec.statement) lines.push('', '## Closing statement', rec.statement);
+  lines.push('', "## The AI's private notes", ...(rec.logs.length ? rec.logs.map((l) => `- Round ${l.round}, ${l.step}: ${l.text}`) : ['(none)']));
+  return `${lines.join('\n')}\n`;
+}
+
+// gamesDir: where a record of every game is kept (omit to keep none).
+export function createApp(env = process.env, { stateFile = null, keyFile = null, gamesDir = null } = {}) {
   // The moderator key: fixed by MOD_KEY in .env, else remembered in keyFile,
   // else created once. It only changes when the moderator asks for a new one.
   const newKey = () => crypto.randomBytes(4).toString('hex');
@@ -54,6 +81,16 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null 
   let speaker = null; // the one table screen that plays the AI's voice
   let game = null;
 
+  // Every game also gets its own record in gamesDir, rewritten after each step, so a
+  // game can be read afterwards even if it was reset, discarded or never finished.
+  function archive() {
+    const rec = gamesDir && game.record();
+    if (!rec) return;
+    fs.mkdirSync(gamesDir, { recursive: true });
+    fs.writeFileSync(path.join(gamesDir, `${rec.id}.json`), JSON.stringify(rec, null, 2));
+    fs.writeFileSync(path.join(gamesDir, `${rec.id}.md`), transcript(rec));
+  }
+
   // Write to a temp file first so a crash mid-write never leaves a broken save.
   let saveWarned = false;
   function save() {
@@ -63,6 +100,7 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null 
       const tmp = `${stateFile}.tmp`;
       fs.writeFileSync(tmp, JSON.stringify(game.serialize()));
       fs.renameSync(tmp, stateFile);
+      archive();
     } catch (err) {
       if (!saveWarned) console.warn(`Could not save the game state: ${err.message}`);
       saveWarned = true;
@@ -100,7 +138,7 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null 
     speech,
     config: {
       language: env.GAME_LANGUAGE === 'de' ? 'de' : 'en',
-      maxQuestions: Number(env.MAX_QUESTIONS) > 0 ? Number(env.MAX_QUESTIONS) : 5,
+      maxQuestions: Number(env.MAX_QUESTIONS) > 0 ? Number(env.MAX_QUESTIONS) : 3,
       forceObjective: env.FORCE_OBJECTIVE || null,
     },
     onChange: broadcast,
@@ -248,7 +286,7 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null 
     skipMove: () => game.skipMove(),
     nextRound: () => game.nextRound(),
     reveal: () => game.reveal(),
-    reset: () => game.reset(true),
+    reset: () => { try { archive(); } catch {} game.reset(true); }, // record the last steps before they are cleared
     undo: () => game.undo(),
     retryAi: () => game.retryAi(),
     setTracks: (m) => game.setTracks(m.values),
@@ -346,7 +384,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   loadEnv();
   const stateFile = path.join(ROOT, 'data', 'game-state.json');
   if (process.argv.includes('--fresh') && fs.existsSync(stateFile)) fs.rmSync(stateFile);
-  const app = createApp(process.env, { stateFile, keyFile: path.join(ROOT, 'data', 'moderator-key.txt') });
+  const app = createApp(process.env, { stateFile, keyFile: path.join(ROOT, 'data', 'moderator-key.txt'), gamesDir: path.join(ROOT, 'data', 'games') });
   await app.ready;
   const port = Number(process.env.PORT) || 3000;
   app.server.listen(port, () => {

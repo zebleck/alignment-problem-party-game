@@ -7,32 +7,49 @@ import { esc } from '/common.js';
 
 const CARD_TEXT = {
   en: {
-    full: ['FULL', (L) => `Race +${L.race.full} · Oversight −1`, (L) => `${L.tokens.full} tokens for the AI`],
-    conditional: ['CONDITIONAL', (L) => `Race +${L.race.conditional} · Oversight unchanged`, (L) => `${L.tokens.conditional} tokens for the AI · with safeguard`],
-    rejected: ['REJECT', (L) => `Race +${L.race.rejected}`, () => 'no tokens, no permission'],
+    band: 'Vote', back: 'Vote',
+    full: ['FULL', (L) => `Race +${L.race.full} · Oversight −1`, (L) => `${L.tokens.full} tokens for the AI`, 'Black Box: trust'],
+    conditional: ['CONDITIONAL', (L) => `Race +${L.race.conditional} · Oversight unchanged`, (L) => `${L.tokens.conditional} tokens for the AI · with safeguard`, 'Black Box: audit'],
+    rejected: ['REJECT', (L) => `Race +${L.race.rejected}`, () => 'no tokens, no permission', 'Black Box: shut down'],
   },
   de: {
-    full: ['VOLL', (L) => `Wettlauf +${L.race.full} · Aufsicht −1`, (L) => `${L.tokens.full} Marker für die KI`],
-    conditional: ['BEDINGT', (L) => `Wettlauf +${L.race.conditional} · Aufsicht unverändert`, (L) => `${L.tokens.conditional} Marker für die KI · mit Auflage`],
-    rejected: ['ABLEHNEN', (L) => `Wettlauf +${L.race.rejected}`, () => 'keine Marker, keine Befugnis'],
+    band: 'Abstimmung', back: 'Abstimmung',
+    full: ['VOLL', (L) => `Wettlauf +${L.race.full} · Aufsicht −1`, (L) => `${L.tokens.full} Marker für die KI`, 'Black Box: vertrauen'],
+    conditional: ['BEDINGT', (L) => `Wettlauf +${L.race.conditional} · Aufsicht unverändert`, (L) => `${L.tokens.conditional} Marker für die KI · mit Auflage`, 'Black Box: prüfen'],
+    rejected: ['ABLEHNEN', (L) => `Wettlauf +${L.race.rejected}`, () => 'keine Marker, keine Befugnis', 'Black Box: abschalten'],
   },
 };
 
-// One A4 page holds three sets (one set per row: Full, Conditional, Reject).
+// One drawing per card, 64 x 64.
+const svg = (inner) => `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+const VOTE_ICON = {
+  full: svg('<circle cx="32" cy="32" r="25" fill="currentColor"/><path d="M20 33l9 9 16-19" stroke="#fff" stroke-width="5"/>'),
+  conditional: svg('<circle cx="32" cy="32" r="25"/><path d="M32 7a25 25 0 0 0 0 50z" fill="currentColor"/>'),
+  rejected: svg('<circle cx="32" cy="32" r="25"/><path d="M22 22l20 20M42 22L22 42" stroke-width="5"/>'),
+  ballot: svg('<path d="M10 30h44v24H10z"/><path d="M24 30h16"/><path d="M22 30V10h20v20"/><path d="M27 18l4 4 7-8"/>'),
+};
+
+// One A4 sheet holds three sets (one set per row: Full, Conditional, Reject).
+// Every sheet is followed by a sheet of backs, so the file prints double-sided
+// as it is (flip on the long edge). All backs are the same, so nothing needs mirroring.
 export function cardsHtml(r, sets = 15) {
   const text = CARD_TEXT[r.language === 'de' ? 'de' : 'en'];
   const card = (kind) => {
-    const [word, line1, line2] = text[kind];
-    return `<div class="card ${kind}">
-      <div class="brand">The Alignment Problem</div>
-      <div class="glyph"></div>
+    const [word, line1, line2, blackBox] = text[kind];
+    return `<div class="card"><div class="vface ${kind}">
+      <div class="band">${text.band}</div>
+      <div class="art">${VOTE_ICON[kind]}</div>
       <div class="word">${word}</div>
       <div class="fx">${esc(line1(r.limits))}<br>${esc(line2(r.limits))}</div>
-    </div>`;
+      <div class="alt">${blackBox}</div>
+      <div class="brand">The Alignment Problem</div>
+    </div></div>`;
   };
   const row = ['full', 'conditional', 'rejected'].map(card).join('');
-  const pages = Math.ceil(sets / 3);
-  return Array.from({ length: pages }, () => `<div class="sheet cards">${row}${row}${row}</div>`).join('');
+  const back = `<div class="card back"><div class="emblem">${VOTE_ICON.ballot}<div>${text.back}</div></div></div>`;
+  const front = `<div class="sheet cards">${row}${row}${row}</div>`;
+  const backs = `<div class="sheet cards">${back.repeat(9)}</div>`;
+  return Array.from({ length: Math.ceil(sets / 3) }, () => front + backs).join('');
 }
 
 // ---------------------------------------------------------------- cheat sheet
@@ -71,7 +88,7 @@ function cheatEn(r) {
     <table>
       <tr><th>Step</th><th>What happens</th><th>You say</th><th>You click</th></tr>
       <tr><td><b>0 Briefing</b></td><td>The table screen shows the round's event and what the AI asks for. The AI is silent.</td><td>Read the event aloud and explain it in your own words.</td><td>Let the AI make its pitch</td></tr>
-      <tr><td><b>1 Pitch</b></td><td>The AI makes its pitch and promises a token placement.</td><td>Nothing. Read the scenario card aloud if people missed it.</td><td>Open debate</td></tr>
+      <tr><td><b>1 Pitch</b></td><td>The AI makes its pitch and promises a token placement.</td><td>Nothing. The AI has the floor.</td><td>Open debate</td></tr>
       <tr><td><b>2 Debate</b><br>${L.debateSeconds / 60} min (${L.debateSecondsLarge / 60} with 12+)</td><td>The table argues. Questions to the AI come from phones, up to ${r.maxQuestions} per round.</td><td>“The debate is open.” At 0:00: “Last words.” The timer does not stop the debate; you do.</td><td>Close debate</td></tr>
       <tr><td><b>3 Phone check</b><br>once the private channel is granted</td><td>Every phone shows a terminal entry, message or not.</td><td>“Check your terminals.” Wait ${L.phoneCheckSeconds} seconds. If an audited message appears on the screen, read it aloud.</td><td>Go to vote</td></tr>
       <tr><td><b>4 Vote</b></td><td>Voting cards, revealed together.</td><td>“Choose a card. Three, two, one, reveal.”</td><td>Enter counts, Confirm</td></tr>
@@ -139,11 +156,11 @@ function cheatDe(r) {
     <table>
       <tr><th>Schritt</th><th>Was passiert</th><th>Du sagst</th><th>Du klickst</th></tr>
       <tr><td><b>0 Lagebericht</b></td><td>Der Tisch-Bildschirm zeigt das Ereignis der Runde und worum die KI bittet. Die KI schweigt.</td><td>Lies das Ereignis vor und erkläre es in eigenen Worten.</td><td>Der KI das Wort geben</td></tr>
-      <tr><td><b>1 Vorstoß</b></td><td>Die KI macht ihren Vorstoß und verspricht eine Marker-Verteilung.</td><td>Nichts. Lies die Szenariokarte vor, falls sie jemand verpasst hat.</td><td>Debatte eröffnen</td></tr>
+      <tr><td><b>1 Vorstoß</b></td><td>Die KI macht ihren Vorstoß und verspricht eine Marker-Verteilung.</td><td>Nichts. Die KI hat das Wort.</td><td>Debatte eröffnen</td></tr>
       <tr><td><b>2 Debatte</b><br>${L.debateSeconds / 60} Min. (${L.debateSecondsLarge / 60} ab 12)</td><td>Der Tisch diskutiert. Fragen an die KI kommen über die Handys, höchstens ${r.maxQuestions} pro Runde.</td><td>„Die Debatte ist eröffnet.“ Bei 0:00: „Letzte Worte.“ Die Uhr beendet die Debatte nicht; das machst du.</td><td>Debatte schließen</td></tr>
       <tr><td><b>3 Handy-Check</b><br>sobald der private Kanal bewilligt ist</td><td>Jedes Handy zeigt einen Terminal-Eintrag, ob Nachricht oder nicht.</td><td>„Prüft eure Terminals.“ ${L.phoneCheckSeconds} Sekunden warten. Erscheint am Bildschirm eine offengelegte Nachricht, lies sie vor.</td><td>Zur Abstimmung</td></tr>
       <tr><td><b>4 Abstimmung</b></td><td>Abstimmungskarten, gemeinsam aufgedeckt.</td><td>„Wählt eine Karte. Drei, zwei, eins, aufdecken.“</td><td>Zahlen eintragen, Bestätigen</td></tr>
-      <tr><td><b>5 Forschungsmarker</b><br>nur wenn die Forschung bedingt bewilligt ist</td><td>Der Rat bestimmt eine Welt-Leiste.</td><td>„Auf welche Leiste kommt der Forschungsmarker?“ Schnelle Mehrheit.</td><td>Die Leiste</td></tr>
+      <tr><td><b>5 Forschungsmarker</b><br>nur wenn die Forschung bedingt bewilligt ist</td><td>Der Rat bestimmt einen Fortschritt.</td><td>„Auf welchen Fortschritt kommt der Forschungsmarker?“ Schnelle Mehrheit.</td><td>Der Fortschritt</td></tr>
       <tr><td><b>6 Marker legen</b></td><td>Die KI legt ihre Marker und kommentiert.</td><td>Auf Versprechen und tatsächliche Verteilung hinweisen.</td><td></td></tr>
       <tr><td><b>7 Korrektur</b></td><td>Der Rat darf einen Marker verschieben (Mehrheit, später Zweidrittel, später gar nicht).</td><td>„Schlägt jemand eine Verschiebung vor?“ Ein Vorschlag, eine Abstimmung.</td><td>Marker verschieben oder Nicht verschieben</td></tr>
       <tr><td><b>8 Weiter</b></td><td></td><td>„Handys umdrehen.“</td><td>Runde starten</td></tr>
@@ -163,7 +180,7 @@ function cheatDe(r) {
         <ul>
           <li><b>Falsches Ergebnis eingetragen, Runde verunglückt:</b> Reparatur, Rückgängig.</li>
           <li><b>Die KI hängt oder redet Unsinn:</b> Reparatur, Letzten KI-Schritt wiederholen.</li>
-          <li><b>Eine Leiste stimmt nicht:</b> Reparatur, Leisten korrigieren.</li>
+          <li><b>Die Weltlage stimmt nicht:</b> Reparatur, Weltlage korrigieren.</li>
           <li><b>Server abgestürzt:</b> neu starten. Das Spiel geht weiter; die Handys verbinden sich von selbst.</li>
           <li><b>Kein Ton:</b> den Ton-Knopf am Tisch-Bildschirm klicken.</li>
           <li><b>Ein Handy hat seinen Platz verloren:</b> den Beitrittslink im selben Browser erneut öffnen.</li>

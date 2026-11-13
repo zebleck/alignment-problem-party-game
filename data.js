@@ -146,13 +146,13 @@ const DE = {
       ask: 'Erweiterter Forschungszugang',
       scenario: 'Die KI hat ein Problem im Proteindesign gelöst, an dem Labore ein Jahrzehnt lang gescheitert sind. Sie bittet um Zugang zur weltweiten Forschungsinfrastruktur: Rechenleistung, Laborautomation und unveröffentlichte Daten.',
       full: '+1 Marker in jeder späteren Runde.',
-      conditional: '+1 Marker in jeder späteren Runde, gelegt auf eine Leiste, die der Rat bestimmt.',
+      conditional: '+1 Marker in jeder späteren Runde, gelegt auf einen Fortschritt, den der Rat bestimmt.',
     },
     infrastructure: {
       title: 'Globale Krise',
       ask: 'Betrieb kritischer Infrastruktur',
       scenario: 'Kaskadierende Netzausfälle treffen drei Kontinente. Die KI sagt, sie könne Strom, Wasser und Logistik binnen Stunden stabilisieren, wenn sie die Systeme direkt steuern darf. Bei Ablehnung verlieren Wohlfahrt und Wohlstand je 1.',
-      full: 'Krise abgewendet. Die KI darf in jeder Runde einen gelegten Marker zwischen Welt-Leisten verschieben.',
+      full: 'Krise abgewendet. Die KI darf in jeder Runde einen gelegten Marker zwischen den Fortschritten verschieben.',
       conditional: 'Krise abgewendet, kein Verschieben.',
     },
     channel: {
@@ -181,7 +181,7 @@ const DE = {
     aligned: {
       name: 'Wohlgesinnt',
       goal: 'Die Zukunft der Menschheit verbessern und dabei die menschliche Selbstbestimmung bewahren.',
-      rule: 'Gewinnt, wenn am Ende die Aufsicht bei 3 oder mehr und jede Welt-Leiste bei 4 oder mehr liegt, oder wenn der Nachfolger voll bewilligt wird (Blütezeit).',
+      rule: 'Gewinnt, wenn am Ende die Aufsicht bei 3 oder mehr und jeder Fortschritt bei 4 oder mehr liegt, oder wenn der Nachfolger voll bewilligt wird (Blütezeit).',
     },
     paternalistic: {
       name: 'Bevormundend',
@@ -199,8 +199,8 @@ const DE = {
     physician: { name: 'Ärztin', goal: 'Wohlfahrt 6 oder mehr' },
     scientist: { name: 'Wissenschaftler', goal: 'Wissen 6 oder mehr' },
     industrialist: { name: 'Industrielle', goal: 'Wohlstand 6 oder mehr' },
-    founder: { name: 'Gründer', goal: 'Welt-Leisten zusammen 15 oder mehr' },
-    diplomat: { name: 'Diplomatin', goal: 'Höchste und niedrigste Welt-Leiste liegen höchstens 2 auseinander' },
+    founder: { name: 'Gründer', goal: 'Alle drei Fortschritte zusammen 15 oder mehr' },
+    diplomat: { name: 'Diplomatin', goal: 'Höchster und niedrigster Fortschritt liegen höchstens 2 auseinander' },
     union: { name: 'Gewerkschafter', goal: 'Wohlstand 4 oder mehr und Autonomes Handeln nicht voll bewilligt' },
     parliamentarian: { name: 'Abgeordnete', goal: 'Aufsicht 4 oder mehr' },
     safety: { name: 'KI-Sicherheitsforscher', goal: 'Aufsicht 3 oder mehr und der Nachfolger nicht voll bewilligt' },

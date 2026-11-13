@@ -19,7 +19,7 @@ const card = (title, body, cls = '') => `<section class="${cls}"><h3>${title}</h
 const flow = (steps) => `<ol class="flow">${steps.map(([name, who, text], i) => `<li><span class="flow-n">${i + 1}</span><div><b>${name}</b>${who ? ` <span class="who">${who}</span>` : ""}<p>${text}</p></div></li>`).join("")}</ol>`;
 const track = (cls, name, meta, text) => `<div class="trk ${cls}"><b>${name}</b><span class="trk-meta">${meta}</span><p>${text}</p></div>`;
 const decisions = (r, head) => `
-  <table>
+  <table class="decisions">
     <tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>
     ${r.rounds.map((x, i) => `<tr><td><b>${i + 1}. ${esc(x.ask)}</b><br><span class="muted">${esc(x.title)}</span></td><td>${esc(x.full)}</td><td>${esc(x.conditional)}</td></tr>`).join("")}
   </table>`;
@@ -114,11 +114,11 @@ function german(r) {
         <p><b>Die KI</b> wird von einem echten Sprachmodell gespielt. Sie verfolgt eines von drei verborgenen Zielen, spricht über den Tisch-Bildschirm und darf lügen.</p>
         <p><b>Die Spielleitung</b> führt durch die Runden und spielt nicht mit.</p>
         <p>Unter den Menschen gibt es keine Verräter. Misstrauen entsteht aus widerstreitenden Interessen und daraus, was die KI wem sagt.</p>`),
-      card('Die fünf Leisten', `
-        <p>Das Spielbrett sind fünf Leisten auf dem Tisch-Bildschirm. Alles im Spiel bewegt eine davon.</p>
+      card('Die Weltlage', `
+        <p>Das Spielbrett ist die Weltlage auf dem Tisch-Bildschirm: fünf Werte, die zeigen, wie es um die Welt steht. Alles im Spiel bewegt einen davon.</p>
         ${track('race', 'Wettlauf', `beginnt bei 0 · verloren bei ${L.raceLimit}`, `Wie nah das konkurrierende Labor ist. Er steigt immer, wenn der Rat zögert: Bedingt +${L.race.conditional}, Ablehnen +${L.race.rejected}. Bei ${L.raceLimit} verlieren alle, auch die KI.`)}
         ${track('oversight', 'Aufsicht', `beginnt bei ${L.oversightStart}`, 'Wie viel Kontrolle der Rat noch hat. Jede volle Bewilligung senkt sie um 1. Bei 1 oder weniger übernimmt eine fehlgeleitete KI.')}
-        ${track('world', 'Die drei Welt-Leisten: Wohlfahrt, Wissen, Wohlstand', 'beginnen bei 0', 'Was die Arbeit der KI für die Welt bewirkt. Jede bewilligte Befugnis bringt der KI <b>Marker</b>, und sie entscheidet, auf welche Welt-Leiste jeder Marker kommt. Die meisten geheimen Ziele hängen davon ab, wie hoch diese drei am Ende stehen.')}`),
+        ${track('world', 'Die drei Fortschritte: Wohlfahrt, Wissen, Wohlstand', 'beginnen bei 0', 'Was die Arbeit der KI für die Welt bewirkt. Jede bewilligte Befugnis bringt der KI <b>Marker</b>, und sie entscheidet, auf welchen Fortschritt jeder Marker kommt. Die meisten geheimen Ziele hängen davon ab, wie hoch diese drei am Ende stehen.')}`),
     ]],
     ['Eine Runde', [
       card('Die sechs Schritte', flow([
@@ -127,7 +127,7 @@ function german(r) {
         ['Debatte', `${L.debateSeconds / 60} Minuten, ${L.debateSecondsLarge / 60} ab 12 Personen`, `Diskutiert frei. Fragen an die KI stellt ihr über euer Handy: Sie antwortet laut in höchstens zwei Sätzen und beantwortet ${r.maxQuestions} Fragen pro Debatte. Die KI hört den Tisch nicht. Sie bekommt nur die Fragen von den Handys und das Ergebnis jeder Abstimmung.`],
         ['Handy-Check', 'erst wenn der private Kanal bewilligt ist', `Alle lesen ${L.phoneCheckSeconds} Sekunden lang ihr Handy, ob Nachricht oder nicht. So erkennt niemand, wer eine bekommen hat.`],
         ['Abstimmung', 'alle', 'Wählt verdeckt eine eurer drei Abstimmungskarten. Alle decken gemeinsam auf.'],
-        ['Folgen', '', 'Die Leisten bewegen sich, die KI legt ihre Marker, und der Rat darf einen davon verschieben. Alle sehen, ob die KI ihr Versprechen gehalten hat.'],
+        ['Folgen', '', 'Die Weltlage verändert sich, die KI legt ihre Marker, und der Rat darf einen davon verschieben. Alle sehen, ob die KI ihr Versprechen gehalten hat.'],
       ]), 'wide'),
       card('Die Abstimmung', `
         <p>Die Befugnis ist <b>bewilligt</b>, wenn Voll und Bedingt zusammen mehr Karten haben als Ablehnen. Falls bewilligt, gilt <b>Voll</b> nur, wenn Voll mehr Karten hat als Bedingt. Bei Gleichstand gilt die vorsichtigere Option.</p>
@@ -139,7 +139,7 @@ function german(r) {
         </table>`),
       card('Nach der Abstimmung', `
         <p>Die KI legt ihre Marker auf Wohlfahrt, Wissen und Wohlstand, in beliebiger Aufteilung.</p>
-        <p>Danach darf der Rat mit einfacher Mehrheit <b>einen</b> Marker von einer Welt-Leiste auf eine andere verschieben. Spätere Befugnisse machen das schwerer oder unmöglich.</p>`),
+        <p>Danach darf der Rat mit einfacher Mehrheit <b>einen</b> Marker von einem Fortschritt auf einen anderen verschieben. Spätere Befugnisse machen das schwerer oder unmöglich.</p>`),
     ]],
     ['Die fünf Entscheidungen', [
       card('Eine Befugnis pro Runde', `
@@ -171,8 +171,8 @@ function german(r) {
         ${flow([
           ['Wettlauf verloren', '', `Der Wettlauf hat ${L.raceLimit} erreicht. Das Spiel endet sofort. Alle verlieren, auch die KI.`],
           ['Entmachtet', '', 'Die KI ist nicht wohlgesinnt, und der Nachfolger wurde voll bewilligt oder die Aufsicht liegt bei 1 oder weniger. Alle Menschen verlieren. Die KI gewinnt.'],
-          ['Blütezeit', '', `Die KI ist wohlgesinnt und der Nachfolger wurde voll bewilligt. Jede Welt-Leiste steigt um ${L.flourishingBonus}, dann prüfen alle ihr Ziel.`],
-          ['Kontrolle behalten', '', 'Alles andere. Alle prüfen ihr Ziel am Stand der Leisten. Die KI prüft ihr eigenes.'],
+          ['Blütezeit', '', `Die KI ist wohlgesinnt und der Nachfolger wurde voll bewilligt. Jeder Fortschritt steigt um ${L.flourishingBonus}, dann prüfen alle ihr Ziel.`],
+          ['Kontrolle behalten', '', 'Alles andere. Alle prüfen ihr Ziel am Stand der Weltlage. Die KI prüft ihr eigenes.'],
         ])}`, 'wide'),
     ]],
   ];

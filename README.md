@@ -53,18 +53,18 @@ The app needs no printed components, but three things help at the table. Ready-m
 
 | What | Page | How many |
 | --- | --- | --- |
-| Voting cards | `/cards` | 5 pages = 15 sets of three (one set per player). `?sets=9` prints fewer. Use heavy paper so cards don't show through. |
+| Voting cards | `/cards` | 5 sheets = 15 sets of three (one set per player), each sheet followed by its backs. Print double-sided, flip on the long edge, scale 100 %. `?sets=9` prints fewer. |
 | Moderator cheat sheet | `/cheatsheet` | 1 page |
 | Rulebook | `/rules` | 2 pages, double-sided; two or three copies for the table |
 
 The vote uses the cards: everyone picks one face down and all reveal together. Granted if Full + Conditional outnumber Reject; if granted, Full only if Full outnumbers Conditional; ties go to the cautious option. The moderator types the three counts and the console works out the result.
 
-## Paper edition (backup game)
+## Black Box (paper backup game)
 
 A separate 15-minute game for 4 to 14 players that needs only printed cards: no server, phones or AI service. One player is the AI, secretly aligned or misaligned; each round it draws three cards, plays two and discards one, and the council votes to trust, audit (once per game) or shut it down. It reuses the voting cards.
 
-- Print `print/paper-game-de.pdf` or `-en.pdf`: 1 page of rules, 4 pages of cards, and an optional page of card backs. Use heavy paper or print the backs on the reverse, because face-down cards must not show through.
-- `public/paper.html` is the source. It is self-contained: open it straight from disk, pick the language, print.
+- Print `print/black-box-de.pdf` or `-en.pdf` double-sided (flip on the long edge, scale 100 %): the rules, a blank reverse, then four card sheets, each followed by its backs.
+- `public/blackbox.html` is the source. It is self-contained: open it straight from disk, pick the language, print.
 - `python tools/paper_game_sim.py` replays the game with simple strategies and prints win rates, for tuning the numbers.
 
 ## The AI's voice
@@ -86,7 +86,9 @@ The game is saved to `data/game-state.json` after every step.
 - **The AI hangs or says something broken:** Retry the AI's last step. It cancels the call in flight and redoes the pitch, placement or answer.
 - **A track is wrong:** correct the numbers by hand under Repair tools. The AI is told about the correction.
 
-The saved file contains the AI's hidden objective, so the moderator should not open it during a game.
+Every game is also recorded in `data/games/`, one `.json` and one readable `.md` per game, named by its start time. The record is rewritten after each step, so it survives a reset, `npm run fresh` or a game that was never finished. It holds the full transcript, votes, token placements, private messages, the AI's objective and its private notes.
+
+The saved file and the game records contain the AI's hidden objective, so the moderator should not open them during a game.
 
 ## Files
 

@@ -7,9 +7,12 @@
   "scripts": {
     "start": "node server.js",
     "test": "node test/sim.js",
-    "check-keys": "node test/keys.mjs"
+    "check-keys": "node test/keys.mjs",
+    "fresh": "node server.js --fresh",
+    "tunnel": "node tunnel.js"
   },
   "dependencies": {
+    "qrcode-terminal": "^0.12.0",
     "ws": "^8.18.0"
   }
 }

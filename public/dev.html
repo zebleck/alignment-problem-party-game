@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Alignment Problem: Solo test bench</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  body { padding: 10px; display: grid; gap: 10px; height: 100vh; grid-template-rows: auto 1.25fr 1fr; }
+  .bar { display: flex; gap: 14px; align-items: center; font-size: 0.85em; }
+  .top { display: grid; grid-template-columns: 1.7fr 1fr; gap: 10px; min-height: 0; }
+  .seats { display: grid; gap: 10px; min-height: 0; }
+  .frame { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .frame .label { padding: 4px 10px; background: var(--panel); }
+  iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b class="mono">SOLO TEST BENCH</b>
+  <span class="muted">Every view in one tab. Each seat is a separate player. Add <span class="mono">&amp;n=6</span> to the address for more seats (3 to 8).</span>
+</div>
+<div class="top">
+  <div class="frame"><div class="label">Table screen</div><iframe id="screen" allow="autoplay"></iframe></div>
+  <div class="frame"><div class="label">Moderator</div><iframe id="mod"></iframe></div>
+</div>
+<div class="seats" id="seats"></div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const n = Math.min(8, Math.max(3, Number(q.get('n')) || 4));
+  const names = ['Anna', 'Jonas', 'Mira', 'Lena', 'Tom', 'Ravi', 'Elif', 'Noah'];
+  document.querySelector('#screen').src = '/screen';
+  document.querySelector('#mod').src = '/mod?key=' + encodeURIComponent(q.get('key') || '');
+  const seats = document.querySelector('#seats');
+  seats.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+  for (let i = 0; i < n; i++) {
+    const f = document.createElement('div');
+    f.className = 'frame';
+    f.innerHTML = `<div class="label">Seat ${i + 1}: ${names[i]}</div><iframe allow="microphone" src="/play?seat=dev${i + 1}&name=${names[i]}"></iframe>`;
+    seats.appendChild(f);
+  }
+</script>
+</body>
+</html>

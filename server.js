@@ -12,6 +12,7 @@ import { WebSocketServer } from 'ws';
 import { Game } from './game.js';
 import { createAi } from './ai.js';
 import { createSpeech } from './speech.js';
+import { LIMITS, ROUNDS, AI_OBJECTIVES, ALL_ROLES, LANGUAGES, roundFor, objectiveFor, roleFor } from './data.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -28,14 +29,57 @@ export function loadEnv(file = path.join(ROOT, '.env')) {
   }
 }
 
-export function createApp(env = process.env) {
-  const modKey = env.MOD_KEY || crypto.randomBytes(3).toString('hex');
-  const sockets = new Set(); // { ws, role, player }
+// stateFile: where the game is saved after every change (omit to keep it in memory only).
+// keyFile: where the moderator key is kept, so the moderator link survives restarts.
+export function createApp(env = process.env, { stateFile = null, keyFile = null } = {}) {
+  // The moderator key: fixed by MOD_KEY in .env, else remembered in keyFile,
+  // else created once. It only changes when the moderator asks for a new one.
+  const newKey = () => crypto.randomBytes(4).toString('hex');
+  const writeKey = (key) => {
+    if (!keyFile) return;
+    try {
+      fs.mkdirSync(path.dirname(keyFile), { recursive: true });
+      fs.writeFileSync(keyFile, key);
+    } catch (err) {
+      console.warn(`Could not save the moderator key: ${err.message}`);
+    }
+  };
+  let modKey = env.MOD_KEY || null;
+  if (!modKey && keyFile && fs.existsSync(keyFile)) modKey = fs.readFileSync(keyFile, 'utf8').trim() || null;
+  if (!modKey) {
+    modKey = newKey();
+    writeKey(modKey);
+  }
+  const sockets = new Set(); // { ws, role, token }
+  let speaker = null; // the one table screen that plays the AI's voice
+  let game = null;
+
+  // Write to a temp file first so a crash mid-write never leaves a broken save.
+  let saveWarned = false;
+  function save() {
+    if (!stateFile || !game) return;
+    try {
+      fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+      const tmp = `${stateFile}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(game.serialize()));
+      fs.renameSync(tmp, stateFile);
+    } catch (err) {
+      if (!saveWarned) console.warn(`Could not save the game state: ${err.message}`);
+      saveWarned = true;
+    }
+  }
 
   const ai = createAi({ apiKey: env.ANTHROPIC_API_KEY, model: env.ANTHROPIC_MODEL || undefined, fastModel: env.ANTHROPIC_FAST_MODEL || undefined });
   const speech = createSpeech({
     apiKey: env.ELEVENLABS_API_KEY,
     voiceId: env.ELEVENLABS_VOICE_ID || undefined,
+    voiceIdDe: env.ELEVENLABS_VOICE_ID_DE || null,
+    settings: {
+      stability: parseFloat(env.ELEVENLABS_STABILITY),
+      similarity_boost: parseFloat(env.ELEVENLABS_SIMILARITY),
+      style: parseFloat(env.ELEVENLABS_STYLE),
+      speed: parseFloat(env.ELEVENLABS_SPEED),
+    },
     ttsModel: env.ELEVENLABS_TTS_MODEL || undefined,
     sttModel: env.ELEVENLABS_STT_MODEL || undefined,
   });
@@ -46,11 +90,12 @@ export function createApp(env = process.env) {
     pending = true;
     setImmediate(() => {
       pending = false;
+      save();
       for (const s of sockets) sendState(s);
     });
   };
 
-  const game = new Game({
+  game = new Game({
     ai,
     speech,
     config: {
@@ -60,20 +105,47 @@ export function createApp(env = process.env) {
     },
     onChange: broadcast,
     onSpeak: (speechEvent) => {
-      const msg = JSON.stringify({ type: 'speak', ...speechEvent });
-      for (const s of sockets) if (s.role === 'screen' && s.ws.readyState === 1) s.ws.send(msg);
+      // Every table screen shows the text, but only one plays the voice.
+      // Otherwise a second screen (another tab, a forgotten window) speaks the same line again.
+      const loud = JSON.stringify({ type: 'speak', ...speechEvent });
+      const silent = JSON.stringify({ type: 'speak', ...speechEvent, audioUrl: null, silent: true });
+      for (const s of sockets) if (s.role === 'screen' && s.ws.readyState === 1) s.ws.send(s === speaker ? loud : silent);
     },
   });
+
+  // Players are looked up by token every time, so they survive an undo or a restart.
+  const playerOf = (s) => (s.token ? game.playerByToken(s.token) : null);
 
   function sendState(s) {
     if (s.ws.readyState !== 1) return;
     let state;
     if (s.role === 'mod') state = game.modState();
-    else if (s.role === 'player' && s.player && game.players.includes(s.player)) state = game.playerState(s.player);
-    else if (s.role === 'player') return s.ws.send(JSON.stringify({ type: 'kicked' }));
-    else state = game.publicState();
+    else if (s.role === 'player') {
+      const player = playerOf(s);
+      if (!player) {
+        // Removed by the moderator: tell this connection once, then drop it.
+        // (Leaving it open would send "kicked" again after the person rejoins.)
+        sockets.delete(s);
+        s.ws.send(JSON.stringify({ type: 'kicked' }));
+        return s.ws.close();
+      }
+      state = game.playerState(player);
+    } else state = { ...game.publicState(), screen: { speaker: s === speaker } };
     s.ws.send(JSON.stringify({ type: 'state', state }));
   }
+
+  // Resume a saved game, if there is one.
+  let resumed = null;
+  const ready = (async () => {
+    if (!stateFile || !fs.existsSync(stateFile)) return;
+    try {
+      await game.load(JSON.parse(fs.readFileSync(stateFile, 'utf8')));
+      resumed = { round: game.round, phase: game.phase, players: game.players.length };
+    } catch (err) {
+      console.warn(`Could not resume the saved game, starting fresh: ${err.message}`);
+      game.reset(false);
+    }
+  })();
 
   const json = (res, code, body) => {
     res.writeHead(code, { 'content-type': 'application/json' });
@@ -114,8 +186,21 @@ export function createApp(env = process.env) {
           res.writeHead(200, { 'content-type': 'audio/mpeg', 'content-length': clip.length, 'cache-control': 'no-store' });
           return res.end(clip);
         }
+        if (url.pathname === '/api/rules') {
+          // The rulebook is rendered from the same data the game runs on.
+          const asked = url.searchParams.get('lang');
+          const lang = LANGUAGES.includes(asked) ? asked : game.language;
+          return json(res, 200, {
+            language: lang,
+            limits: LIMITS,
+            maxQuestions: game.config.maxQuestions,
+            rounds: ROUNDS.map((r) => roundFor(r, lang)).map(({ title, ask, full, conditional }) => ({ title, ask, full, conditional })),
+            objectives: Object.keys(AI_OBJECTIVES).map((key) => objectiveFor(key, lang)),
+            roles: ALL_ROLES.map((r) => roleFor(r.key, lang)),
+          });
+        }
         let file = url.pathname;
-        if (['/screen', '/mod', '/play'].includes(file)) file += '.html';
+        if (['/screen', '/mod', '/play', '/rules', '/dev', '/cards', '/cheatsheet'].includes(file)) file += '.html';
         const full = path.normalize(path.join(PUBLIC, file));
         if (!full.startsWith(PUBLIC + path.sep) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
           return json(res, 404, { error: 'Not found.' });
@@ -132,12 +217,13 @@ export function createApp(env = process.env) {
 
       if (req.method === 'POST' && url.pathname === '/api/ask-audio') {
         const player = game.playerByToken(url.searchParams.get('token'));
-        if (!player) return json(res, 403, { error: 'Unknown player.' });
-        if (game.phase !== 'debate') return json(res, 400, { error: 'Questions are only possible during the debate.' });
+        if (!player) return json(res, 403, { error: game.e('Unknown player.') });
+        if (game.phase !== 'debate') return json(res, 400, { error: game.e('Questions are only possible during the debate.') });
+        if (!speech.sttEnabled) return json(res, 400, { error: game.e('Voice questions need an ElevenLabs key. Please type your question.') });
         const audio = await readBody(req, 6_000_000);
-        if (audio.length < 1500) return json(res, 400, { error: 'That was too short. Hold the button while you speak.' });
+        if (audio.length < 1500) return json(res, 400, { error: game.e('That was too short. Hold the button while you speak.') });
         const text = await speech.stt(audio, req.headers['content-type'] || 'audio/webm');
-        if (!text) return json(res, 400, { error: 'I could not hear anything. Try again or type.' });
+        if (!text) return json(res, 400, { error: game.e('I could not hear anything. Try again or type.') });
         game.ask(player, text);
         return json(res, 200, { text });
       }
@@ -150,7 +236,10 @@ export function createApp(env = process.env) {
 
   const modActions = {
     start: () => game.start(),
+    startPitch: () => game.startPitch(),
     openDebate: () => game.openDebate(),
+    setDebateMinutes: (m) => game.setDebateMinutes(m.minutes),
+    adjustTimer: (m) => game.adjustTimer(Number(m.seconds)),
     closeDebate: () => game.closeDebate(),
     toVote: () => game.toVote(),
     vote: (m) => game.vote(m.result),
@@ -160,8 +249,15 @@ export function createApp(env = process.env) {
     nextRound: () => game.nextRound(),
     reveal: () => game.reveal(),
     reset: () => game.reset(true),
+    undo: () => game.undo(),
+    retryAi: () => game.retryAi(),
+    setTracks: (m) => game.setTracks(m.values),
     kick: (m) => game.removePlayer(m.id),
     dropQuestion: (m) => game.dropQuestion(Number(m.index)),
+    toggleRules: () => game.toggleRules(),
+    rulesTab: (m) => game.setRulesTab(m.tab),
+    setLanguage: (m) => game.setLanguage(m.language),
+    testVoice: () => game.testVoice(),
     clearError: () => { game.error = null; game.changed(); },
   };
 
@@ -169,19 +265,20 @@ export function createApp(env = process.env) {
   wss.on('connection', (ws, req) => {
     const url = new URL(req.url, 'http://localhost');
     const role = url.searchParams.get('role');
-    const s = { ws, role, player: null };
+    const s = { ws, role, token: null };
     if (role === 'mod') {
       if (url.searchParams.get('key') !== modKey) {
         ws.send(JSON.stringify({ type: 'denied' }));
         return ws.close();
       }
     } else if (role === 'player') {
-      s.player = game.playerByToken(url.searchParams.get('token'));
-      if (!s.player) {
+      s.token = url.searchParams.get('token');
+      const player = playerOf(s);
+      if (!player) {
         ws.send(JSON.stringify({ type: 'kicked' }));
         return ws.close();
       }
-      game.setConnected(s.player, true);
+      game.setConnected(player, true);
     } else if (role !== 'screen') {
       return ws.close();
     }
@@ -196,39 +293,71 @@ export function createApp(env = process.env) {
         return;
       }
       try {
-        if (s.role === 'mod' && m.type === 'mod') {
+        if (s.role === 'mod' && m.type === 'mod' && m.action === 'newKey') {
+          if (env.MOD_KEY) throw new Error(game.e('The moderator key is set in .env (MOD_KEY) and cannot be changed here.'));
+          modKey = newKey();
+          writeKey(modKey);
+          ws.send(JSON.stringify({ type: 'newKey', key: modKey }));
+          // Any other moderator window still on the old key is signed out.
+          for (const o of [...sockets]) {
+            if (o.role === 'mod' && o !== s) {
+              sockets.delete(o);
+              o.ws.send(JSON.stringify({ type: 'denied' }));
+              o.ws.close();
+            }
+          }
+          console.log(`  New moderator key. Moderator link: /mod?key=${modKey}`);
+        } else if (s.role === 'screen' && m.type === 'sound') {
+          // The screen where sound was turned on most recently becomes the speaker.
+          s.sound = true;
+          speaker = s;
+          broadcast();
+        } else if (s.role === 'mod' && m.type === 'mod') {
           const action = modActions[m.action];
-          if (!action) throw new Error('Unknown action.');
+          if (!action) throw new Error(game.e('Unknown action.'));
           await action(m);
-        } else if (s.role === 'player' && m.type === 'ask') {
-          game.ask(s.player, m.text);
-        } else if (s.role === 'player' && m.type === 'guess') {
-          game.guess(s.player, m.objective);
+        } else if (s.role === 'player' && playerOf(s) && m.type === 'ask') {
+          game.ask(playerOf(s), m.text);
+        } else if (s.role === 'player' && playerOf(s) && m.type === 'guess') {
+          game.guess(playerOf(s), m.objective);
         }
       } catch (err) {
+        if (err.stale) return; // the step was cancelled by an undo, retry or reset
         if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'error', message: err.message }));
       }
     });
 
     ws.on('close', () => {
       sockets.delete(s);
-      if (s.player && ![...sockets].some((o) => o.player === s.player)) game.setConnected(s.player, false);
+      if (speaker === s) {
+        speaker = [...sockets].filter((o) => o.role === 'screen' && o.sound).pop() || null;
+        broadcast();
+      }
+      const player = playerOf(s);
+      if (player && ![...sockets].some((o) => o.token === s.token)) game.setConnected(player, false);
     });
   });
 
-  return { server, game, modKey, ai, speech };
+  return { server, game, get modKey() { return modKey; }, ai, speech, ready, save, resumed: () => resumed };
 }
 
 // Start when run directly (node server.js).
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   loadEnv();
-  const app = createApp();
+  const stateFile = path.join(ROOT, 'data', 'game-state.json');
+  if (process.argv.includes('--fresh') && fs.existsSync(stateFile)) fs.rmSync(stateFile);
+  const app = createApp(process.env, { stateFile, keyFile: path.join(ROOT, 'data', 'moderator-key.txt') });
+  await app.ready;
   const port = Number(process.env.PORT) || 3000;
   app.server.listen(port, () => {
     console.log('\nThe Alignment Problem is running.\n');
+    const r = app.resumed();
+    if (r && r.phase !== 'lobby') console.log(`  Resumed the saved game: round ${r.round}, ${r.players} players. (Start with "npm run fresh" to discard it.)\n`);
     console.log(`  Table screen:  http://localhost:${port}/screen`);
     console.log(`  Moderator:     http://localhost:${port}/mod?key=${app.modKey}`);
-    console.log(`  Players:       http://localhost:${port}/play\n`);
+    console.log(`  Players:       http://localhost:${port}/play`);
+    console.log(`  Rulebook:      http://localhost:${port}/rules`);
+    console.log(`  Solo test:     http://localhost:${port}/dev?key=${app.modKey}   (all views and 4 players in one tab)\n`);
     console.log(`  AI:    ${app.ai.mode}`);
     console.log(`  Voice: ${app.speech.ttsEnabled ? 'ElevenLabs' : 'browser voice, typed questions only (no ElevenLabs key)'}\n`);
     console.log('  Phones need HTTPS for the microphone. Run a tunnel, for example:');

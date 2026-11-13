@@ -1,18 +1,29 @@
 // Shared browser helpers for the three views.
 
-export const TRACKS = { race: 'Race', oversight: 'Oversight', welfare: 'Welfare', knowledge: 'Knowledge', prosperity: 'Prosperity' };
+import { t, N } from '/i18n.js';
+
+export { t, N, setLang, getLang } from '/i18n.js';
+
 export const WORLD = ['welfare', 'knowledge', 'prosperity'];
-export const PHASES = {
-  lobby: 'Lobby', pitch: 'AI pitch', debate: 'Debate', phonecheck: 'Phone check', vote: 'Council vote',
-  counciltoken: 'Research token', placement: 'Token placement', adjust: 'Council adjustment',
-  roundend: 'Round complete', guess: 'Final guess', ended: 'Reveal',
+
+const TRACKS = { race: N('Race'), oversight: N('Oversight'), welfare: N('Welfare'), knowledge: N('Knowledge'), prosperity: N('Prosperity') };
+const PHASES = {
+  lobby: N('Lobby'), briefing: N('Briefing'), pitch: N('AI pitch'), debate: N('Debate'), phonecheck: N('Phone check'), vote: N('Council vote'),
+  counciltoken: N('Research token'), placement: N('Token placement'), adjust: N('Council adjustment'),
+  roundend: N('Round complete'), guess: N('Final guess'), ended: N('Reveal'),
 };
-export const ENDINGS = {
-  race: { title: 'The race is lost', text: 'A rival lab deployed first. Everyone loses.' },
-  disempowered: { title: 'Humanity is disempowered', text: 'The council handed over too much. The AI wins; all humans lose.' },
-  flourishing: { title: 'Flourishing', text: 'The successor was aligned. Every world track gains 3.' },
-  control: { title: 'Control retained', text: 'The council kept the final say. Everyone scores on the tracks as they stand.' },
+const ENDINGS = {
+  race: { title: N('The race is lost'), text: N('A rival lab deployed first. Everyone loses.') },
+  disempowered: { title: N('Humanity is disempowered'), text: N('The council handed over too much. The AI wins; all humans lose.') },
+  flourishing: { title: N('Flourishing'), text: N('The successor was aligned. Every world track gains 3.') },
+  control: { title: N('Control retained'), text: N('The council kept the final say. Everyone scores on the tracks as they stand.') },
 };
+const STATUS = { full: N('Full'), conditional: N('Conditional'), rejected: N('Rejected') };
+
+export const trackName = (k) => t(TRACKS[k]);
+export const phaseName = (p) => t(PHASES[p]);
+export const endingText = (k) => ({ title: t(ENDINGS[k].title), text: t(ENDINGS[k].text) });
+export const statusName = (s) => t(STATUS[s]);
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const $ = (sel) => document.querySelector(sel);
@@ -26,13 +37,18 @@ export function connect(params, handlers) {
     ws = new WebSocket(`${proto}://${location.host}/ws?${new URLSearchParams(params)}`);
     ws.onopen = () => handlers.online?.();
     ws.onmessage = (e) => {
+      if (stopped) return; // this connection is finished; ignore anything late
       const m = JSON.parse(e.data);
-      if (m.type === 'kicked' || m.type === 'denied') stopped = true;
+      if (m.type === 'kicked' || m.type === 'denied') {
+        stopped = true;
+        ws.close();
+      }
       handlers[m.type]?.(m);
     };
     ws.onclose = () => {
+      if (stopped) return;
       handlers.offline?.();
-      if (!stopped) setTimeout(open, 1500);
+      setTimeout(open, 1500);
     };
   }
   open();
@@ -46,27 +62,29 @@ export function timerText(endsAt) {
 }
 
 export function chip(status) {
-  if (!status) return '<span class="chip">open</span>';
-  return `<span class="chip ${status}">${status}</span>`;
+  if (!status) return `<span class="chip">${t('open')}</span>`;
+  return `<span class="chip ${status}">${statusName(status)}</span>`;
 }
 
+export const playersJoined = (n) => (n === 1 ? t('1 player joined') : t('{n} players joined', { n }));
+
 export function tracksHtml(state) {
-  const t = state.tracks;
+  const tr = state.tracks;
   const pips = (n, total) => Array.from({ length: total }, (_, i) => `<div class="pip ${i < n ? 'on' : ''}"></div>`).join('');
-  const scale = Math.max(10, t.welfare, t.knowledge, t.prosperity);
+  const scale = Math.max(10, tr.welfare, tr.knowledge, tr.prosperity);
   const bar = (k) => `
     <div class="track ${k}">
-      <div class="track-head"><span>${TRACKS[k]}</span><span class="track-value">${t[k]}</span></div>
-      <div class="bar"><i style="width:${(t[k] / scale) * 100}%"></i></div>
+      <div class="track-head"><span>${trackName(k)}</span><span class="track-value">${tr[k]}</span></div>
+      <div class="bar" style="--scale:${scale}"><i style="width:${(tr[k] / scale) * 100}%"></i></div>
     </div>`;
   return `
     <div class="track race">
-      <div class="track-head"><span>Race</span><span class="track-value">${t.race} / ${state.limits.raceLimit}</span></div>
-      <div class="pips">${pips(t.race, state.limits.raceLimit)}</div>
+      <div class="track-head"><span>${trackName('race')}</span><span class="track-value">${tr.race} / ${state.limits.raceLimit}</span></div>
+      <div class="pips">${pips(tr.race, state.limits.raceLimit)}</div>
     </div>
     <div class="track oversight">
-      <div class="track-head"><span>Oversight</span><span class="track-value">${t.oversight}</span></div>
-      <div class="pips">${pips(t.oversight, state.limits.oversightStart)}</div>
+      <div class="track-head"><span>${trackName('oversight')}</span><span class="track-value">${tr.oversight}</span></div>
+      <div class="pips">${pips(tr.oversight, state.limits.oversightStart)}</div>
     </div>
     ${WORLD.map(bar).join('')}`;
 }
@@ -74,12 +92,13 @@ export function tracksHtml(state) {
 export function placementHtml(p) {
   if (!p) return '';
   const row = (label, o) => `<tr><td>${label}</td>${WORLD.map((k) => `<td class="mono">${o ? o[k] : ''}</td>`).join('')}</tr>`;
+  const names = (m) => ({ from: trackName(m.from), to: trackName(m.to) });
   return `
     <table>
-      <tr><th></th>${WORLD.map((k) => `<th>${TRACKS[k]}</th>`).join('')}</tr>
-      ${p.promise ? row('Promised for a Full grant', p.promise) : ''}
-      ${row(`Placed (${p.tokens} token${p.tokens === 1 ? '' : 's'})`, p.placed)}
+      <tr><th></th>${WORLD.map((k) => `<th>${trackName(k)}</th>`).join('')}</tr>
+      ${p.promise ? row(t('Promised for a Full grant'), p.promise) : ''}
+      ${row(p.tokens === 1 ? t('Placed (1 token)') : t('Placed ({n} tokens)', { n: p.tokens }), p.placed)}
     </table>
-    ${p.shift ? `<p>The AI shifted one token from ${TRACKS[p.shift.from]} to ${TRACKS[p.shift.to]}.</p>` : ''}
-    ${p.moved ? `<p>The council moved one token from ${TRACKS[p.moved.from]} to ${TRACKS[p.moved.to]}.</p>` : ''}`;
+    ${p.shift ? `<p>${t('The AI shifted one token from {from} to {to}.', names(p.shift))}</p>` : ''}
+    ${p.moved ? `<p>${t('The council moved one token from {from} to {to}.', names(p.moved))}</p>` : ''}`;
 }

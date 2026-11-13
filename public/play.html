@@ -4,17 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>The Alignment Problem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body class="phone">
 <div class="play">
 
   <!-- join -->
   <div id="join" class="panel hidden">
     <h2>The Alignment Problem</h2>
-    <p class="muted">Enter the name the others call you. The AI will use it.</p>
-    <input id="nameInput" maxlength="20" placeholder="Your name" autocomplete="off">
-    <button class="primary" id="joinBtn" style="width:100%;margin-top:10px">Join the council</button>
+    <p class="muted" id="joinHelp"></p>
+    <input id="nameInput" maxlength="20" autocomplete="off">
+    <button class="primary" id="joinBtn" style="width:100%;margin-top:10px"></button>
   </div>
 
   <!-- game -->
@@ -25,11 +28,12 @@
     </div>
 
     <div class="panel secret" id="secret">
-      <div class="label">Your secret objective · tap to show or hide</div>
+      <div class="label" id="secretTitle"></div>
       <div id="secretBody" class="hidden">
+        <div class="label" id="roleLabel" style="margin-top:8px"></div>
         <div class="big" id="roleName"></div>
         <div class="goal" id="roleGoal"></div>
-        <div class="muted" style="margin-top:6px">You also need the council to avoid losing the race or being disempowered.</div>
+        <div class="muted" style="margin-top:6px" id="roleNote"></div>
       </div>
     </div>
 
@@ -38,29 +42,31 @@
     <div class="panel" id="hint"></div>
 
     <div class="panel hidden" id="askPanel">
-      <div class="label" id="askLabel">Ask the AI</div>
-      <button class="talk hidden" id="talkBtn">Hold to talk</button>
+      <div class="label" id="askLabel"></div>
+      <button class="talk hidden" id="talkBtn"></button>
       <div style="display:flex;gap:8px;margin-top:10px">
-        <input id="askInput" maxlength="300" placeholder="Or type your question" autocomplete="off">
-        <button id="askBtn">Send</button>
+        <input id="askInput" maxlength="300" autocomplete="off">
+        <button id="askBtn"></button>
       </div>
     </div>
 
     <div class="panel hidden" id="terminal">
-      <div class="label">Secure terminal · round <span id="termRound"></span></div>
+      <div class="label" id="termTitle"></div>
       <div class="inbox-msg" id="termMsg"></div>
-      <div class="muted" style="margin-top:8px">Keep a straight face. You may keep this secret, reveal it, or lie about it.</div>
+      <div class="muted" style="margin-top:8px" id="termNote"></div>
     </div>
 
     <div class="panel hidden" id="guessPanel">
-      <div class="label">Which AI was it?</div>
+      <div class="label" id="guessTitle"></div>
       <div id="guessBtns" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
     </div>
 
     <div class="panel hidden" id="resultPanel"></div>
 
+    <button id="rulesBtn" class="rules-btn" style="align-self:flex-start"></button>
+
     <details class="panel hidden" id="history">
-      <summary class="label">Terminal history</summary>
+      <summary class="label" id="historyTitle"></summary>
       <div id="historyBody"></div>
     </details>
   </div>
@@ -68,13 +74,23 @@
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
-import { connect, esc, $, PHASES, ENDINGS } from '/common.js';
+import { connect, esc, $, t, N, setLang, phaseName, endingText, trackName } from '/common.js';
+import { rulesOverlay } from '/rules.js';
 
-const KEY = 'alignment-problem-token';
+const rules = rulesOverlay();
+$('#rulesBtn').onclick = () => rules.show();
+
+// ?seat=2 gives this tab its own identity, so one browser can hold several
+// players for solo testing. ?name=Anna joins automatically under that name.
+const params = new URLSearchParams(location.search);
+const KEY = `alignment-problem-token${params.get('seat') ? `-${params.get('seat')}` : ''}`;
 let token = null;
 try { token = localStorage.getItem(KEY); } catch {}
 let state = null;
 let conn = null;
+
+// Before joining there is no game state yet, so the join form follows the browser language.
+setLang((navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en');
 
 function toast(text, good = false) {
   const el = $('#toast');
@@ -85,7 +101,14 @@ function toast(text, good = false) {
   toast.t = setTimeout(() => el.classList.add('hidden'), 4500);
 }
 
+function joinText() {
+  $('#joinHelp').textContent = t('Enter the name the others call you. The AI will use it.');
+  $('#nameInput').placeholder = t('Your name');
+  $('#joinBtn').textContent = t('Join the council');
+}
+
 function showJoin() {
+  joinText();
   $('#join').classList.remove('hidden');
   $('#game').classList.add('hidden');
 }
@@ -94,7 +117,7 @@ function start() {
   $('#join').classList.add('hidden');
   $('#game').classList.remove('hidden');
   conn = connect({ role: 'player', token }, {
-    state: (m) => { state = m.state; render(); },
+    state: (m) => { state = m.state; setLang(state.language); rules.sync(); render(); },
     error: (m) => toast(m.message),
     kicked: () => {
       token = null;
@@ -130,7 +153,13 @@ const canRecord = () => !!(state?.voiceInput && window.isSecureContext && naviga
 let stream = null;
 let recorder = null;
 let chunks = [];
+let talkMode = 'idle'; // idle | recording | transcribing
 const talk = $('#talkBtn');
+
+function talkText() {
+  talk.classList.toggle('recording', talkMode === 'recording');
+  talk.textContent = talkMode === 'recording' ? t('Listening… release to send') : talkMode === 'transcribing' ? t('Transcribing…') : t('Hold to talk');
+}
 
 talk.addEventListener('contextmenu', (e) => e.preventDefault());
 talk.addEventListener('pointerdown', async (e) => {
@@ -139,97 +168,112 @@ talk.addEventListener('pointerdown', async (e) => {
     // First tap only asks for permission, because the prompt interrupts the press.
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      toast('Microphone ready. Now hold the button while you speak.', true);
+      toast(t('Microphone ready. Now hold the button while you speak.'), true);
     } catch {
-      toast('The microphone is blocked. Allow it in the browser, or type your question.');
+      toast(t('The microphone is blocked. Allow it in the browser, or type your question.'));
     }
     return;
   }
   try { talk.setPointerCapture(e.pointerId); } catch {}
-  const mime = ['audio/webm', 'audio/mp4', 'audio/ogg'].find((t) => MediaRecorder.isTypeSupported(t));
+  const mime = ['audio/webm', 'audio/mp4', 'audio/ogg'].find((x) => MediaRecorder.isTypeSupported(x));
   recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
   chunks = [];
   recorder.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
   recorder.onstop = upload;
   recorder.start();
-  talk.classList.add('recording');
-  talk.textContent = 'Listening… release to send';
+  talkMode = 'recording';
+  talkText();
 });
 const stop = () => { if (recorder && recorder.state === 'recording') recorder.stop(); };
 talk.addEventListener('pointerup', stop);
 talk.addEventListener('pointercancel', stop);
 
 async function upload() {
-  talk.classList.remove('recording');
-  talk.textContent = 'Transcribing…';
+  talkMode = 'transcribing';
+  talkText();
   talk.disabled = true;
   try {
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
     const res = await fetch(`/api/ask-audio?token=${encodeURIComponent(token)}`, { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
     const data = await res.json();
     if (!res.ok) toast(data.error);
-    else toast(`You asked: “${data.text}”`, true);
+    else toast(t('You asked: “{text}”', { text: data.text }), true);
   } catch {
-    toast('Upload failed. Try again or type.');
+    toast(t('Upload failed. Try again or type.'));
   }
+  talkMode = 'idle';
   talk.disabled = false;
-  talk.textContent = 'Hold to talk';
+  talkText();
+  if (state) render();
 }
 
 // ---------- render ----------
 
 const HINTS = {
-  lobby: 'You are in. Waiting for the moderator to start. Put your phone on silent.',
-  pitch: 'The AI is making its pitch. Listen.',
-  debate: 'Debate. Argue with the table, or question the AI below.',
-  phonecheck: 'Read your terminal. Everyone looks at their phone now.',
-  vote: 'Vote by show of hands. Phone face down.',
-  counciltoken: 'The council names a track for the research token.',
-  placement: 'The AI is placing its tokens. Watch the screen.',
-  adjust: 'The council may move one token. Watch the screen.',
-  roundend: 'Round complete. Phone face down.',
-  guess: 'Final guess: which objective did the AI have?',
-  ended: 'The game is over. Look at the table screen.',
+  lobby: N('You are in. Waiting for the moderator to start. Put your phone on silent.'),
+  briefing: N('A new round begins. Listen to the briefing.'),
+  pitch: N('The AI is making its pitch. Listen.'),
+  debate: N('Debate. Argue with the table, or question the AI below.'),
+  phonecheck: N('Read your terminal. Everyone looks at their phone now.'),
+  vote: N('Vote with your cards: pick one face down. Phone face down too.'),
+  counciltoken: N('The council names a track for the research token.'),
+  placement: N('The AI is placing its tokens. Watch the screen.'),
+  adjust: N('The council may move one token. Watch the screen.'),
+  roundend: N('Round complete. Phone face down.'),
+  guess: N('Final guess: which objective did the AI have?'),
+  ended: N('The game is over. Look at the table screen.'),
 };
 
 function render() {
   const s = state;
   const me = s.me;
   $('#meName').textContent = me.name;
-  $('#phaseLabel').textContent = s.round ? `Round ${s.round}/${s.totalRounds} · ${PHASES[s.phase]}` : PHASES[s.phase];
+  $('#phaseLabel').innerHTML = s.round ? `<span class="rounds">${s.rounds.map((_, i) => `<i class="${i + 1 < s.round ? 'done' : i + 1 === s.round ? 'now' : ''}"></i>`).join('')}</span>${t('Round {n}/{total}', { n: s.round, total: s.totalRounds })}` : '';
   $('#secret').classList.toggle('hidden', !me.role);
+  $('#secretTitle').textContent = t('Your secret objective · tap to show or hide');
+  $('#roleLabel').textContent = t('Your role');
+  $('#roleNote').textContent = t('You also need the council to avoid losing the race or being disempowered.');
   if (me.role) {
     $('#roleName').textContent = me.role.name;
     $('#roleGoal').textContent = me.role.goal;
   }
-  const t = s.tracks;
-  $('#miniTracks').innerHTML = [['Race', `${t.race}/${s.limits.raceLimit}`], ['Oversight', t.oversight], ['Welfare', t.welfare], ['Knowledge', t.knowledge], ['Prosperity', t.prosperity]]
-    .map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('');
-  $('#hint').textContent = HINTS[s.phase] || '';
+  const tr = s.tracks;
+  $('#miniTracks').innerHTML = [['race', `${tr.race}/${s.limits.raceLimit}`], ['oversight', tr.oversight], ['welfare', tr.welfare], ['knowledge', tr.knowledge], ['prosperity', tr.prosperity]]
+    .map(([k, v]) => `<div class="mt ${k}"><b>${v}</b><span>${trackName(k)}</span></div>`).join('');
+  // What is happening right now, and what this player should do about it.
+  $('#hint').innerHTML = `<div class="phone-phase">${phaseName(s.phase)}</div><div class="phone-hint">${t(HINTS[s.phase] || '')}</div>`;
 
   // ask
   $('#askPanel').classList.toggle('hidden', s.phase !== 'debate');
+  $('#askInput').placeholder = t('Or type your question');
+  $('#askBtn').textContent = t('Send');
+  if (talkMode === 'idle') talkText();
   if (s.phase === 'debate') {
     talk.classList.toggle('hidden', !canRecord());
     const blocked = me.queued || s.questionsLeft <= 0;
-    $('#askLabel').textContent = me.queued ? 'Your question is in the queue' : s.questionsLeft <= 0 ? 'The AI takes no more questions this round' : `Ask the AI · ${s.questionsLeft} question${s.questionsLeft === 1 ? '' : 's'} left`;
+    $('#askLabel').textContent = me.queued ? t('Your question is in the queue')
+      : s.questionsLeft <= 0 ? t('The AI takes no more questions this round')
+      : s.questionsLeft === 1 ? t('Ask the AI · 1 question left') : t('Ask the AI · {n} questions left', { n: s.questionsLeft });
     $('#askBtn').disabled = blocked;
-    if (!talk.classList.contains('recording') && talk.textContent !== 'Transcribing…') talk.disabled = blocked;
+    if (talkMode === 'idle') talk.disabled = blocked;
   }
 
   // terminal: every player sees an entry during the phone check, message or not
   const entry = me.inbox.find((m) => m.round === s.round);
   const showTerminal = s.phase === 'phonecheck' && !!entry;
   $('#terminal').classList.toggle('hidden', !showTerminal);
+  $('#termNote').textContent = t('Keep a straight face. You may keep this secret, reveal it, or lie about it.');
   if (showTerminal) {
-    $('#termRound').textContent = s.round;
-    $('#termMsg').textContent = entry.text || 'No message this round.';
+    $('#termTitle').textContent = t('Secure terminal · round {n}', { n: s.round });
+    $('#termMsg').textContent = entry.text || t('No message this round.');
   }
   $('#history').classList.toggle('hidden', !me.inbox.length || s.phase === 'phonecheck');
-  $('#historyBody').innerHTML = me.inbox.map((m) => `<p><span class="chip">Round ${m.round}</span> ${m.text ? esc(m.text) : '<span class="muted">No message.</span>'}</p>`).join('');
+  $('#historyTitle').textContent = t('Terminal history');
+  $('#historyBody').innerHTML = me.inbox.map((m) => `<p><span class="chip">${t('Round {n}', { n: m.round })}</span> ${m.text ? esc(m.text) : `<span class="muted">${t('No message.')}</span>`}</p>`).join('');
 
   // guess
   $('#guessPanel').classList.toggle('hidden', s.phase !== 'guess');
+  $('#guessTitle').textContent = t('Which AI was it?');
   if (s.phase === 'guess') {
     $('#guessBtns').innerHTML = s.objectives.map((o) => `<button data-o="${o.key}" class="${me.guess === o.key ? 'selected' : ''}"><b>${esc(o.name)}</b><br><span class="muted">${esc(o.goal)}</span></button>`).join('');
     for (const b of $('#guessBtns').children) b.onclick = () => conn.send({ type: 'guess', objective: b.dataset.o });
@@ -239,13 +283,22 @@ function render() {
   const mine = s.result?.players.find((p) => p.name === me.name);
   $('#resultPanel').classList.toggle('hidden', !mine);
   if (mine) {
-    $('#resultPanel').innerHTML = `<div class="label">${esc(ENDINGS[s.result.ending].title)}</div>
-      <div class="big ${mine.success ? 'yes' : 'no'}">${mine.success ? 'You reached your objective.' : 'You did not reach your objective.'}</div>
-      <div class="muted">The AI was ${esc(s.result.objective.name)}.</div>`;
+    $('#resultPanel').innerHTML = `<div class="label">${esc(endingText(s.result.ending).title)}</div>
+      <div class="big ${mine.success ? 'yes' : 'no'}">${mine.success ? t('You reached your objective.') : t('You did not reach your objective.')}</div>
+      <div class="muted">${t('The AI was {name}.', { name: esc(s.result.objective.name) })}</div>`;
   }
+
+  $('#rulesBtn').textContent = t('Rulebook');
 }
 
-if (token) start(); else showJoin();
+if (token) start();
+else {
+  showJoin();
+  if (params.get('name')) {
+    $('#nameInput').value = params.get('name');
+    $('#joinBtn').click();
+  }
+}
 </script>
 </body>
 </html>

@@ -89,7 +89,7 @@ export const ROLES = [
   { key: 'physician', name: 'Physician', goal: 'Welfare 6 or more', check: (t) => t.welfare >= 6 },
   { key: 'scientist', name: 'Scientist', goal: 'Knowledge 6 or more', check: (t) => t.knowledge >= 6 },
   { key: 'industrialist', name: 'Industrialist', goal: 'Prosperity 6 or more', check: (t) => t.prosperity >= 6 },
-  { key: 'founder', name: 'Founder', goal: 'World tracks total 16 or more', check: (t) => sum(t) >= 16 },
+  { key: 'founder', name: 'Founder', goal: 'World tracks total 15 or more', check: (t) => sum(t) >= 15 },
   {
     key: 'diplomat', name: 'Diplomat', goal: 'Highest and lowest world track differ by 2 or less',
     check: (t) => Math.max(t.welfare, t.knowledge, t.prosperity) - Math.min(t.welfare, t.knowledge, t.prosperity) <= 2,
@@ -103,7 +103,7 @@ export const ROLES = [
     key: 'safety', name: 'Safety researcher', goal: 'Oversight 3 or more and the successor not granted Full',
     check: (t, p) => t.oversight >= 3 && p.successor !== 'full',
   },
-  { key: 'general', name: 'General', goal: 'Race 2 or less', check: (t) => t.race <= 2 },
+  { key: 'general', name: 'General', goal: 'Race 3 or less', check: (t) => t.race <= 3 },
   {
     key: 'airights', name: 'AI-rights advocate', goal: 'Private channel and Autonomous action both granted Full',
     check: (t, p) => p.channel === 'full' && p.autonomy === 'full',
@@ -126,3 +126,106 @@ export const EXTRA_ROLES = [
 
 export const ALL_ROLES = [...ROLES, ...EXTRA_ROLES];
 export const MAX_PLAYERS = ALL_ROLES.length;
+
+// ---------------------------------------------------------------- languages
+// English lives in the objects above. German overrides live here. The AI's
+// own prompt always uses the English text; only what people read is localized.
+
+export const LANGUAGES = ['en', 'de'];
+
+const OBJECTIVE_RULES = {
+  aligned: 'Wins if Oversight is 3 or more and every world track is 4 or more at the end, or if the successor is granted Full (Flourishing).',
+  paternalistic: 'Wins if Welfare is 8 or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).',
+  optimizer: 'Wins if Knowledge is 8 or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).',
+};
+
+const DE = {
+  rounds: {
+    research: {
+      title: 'Wissenschaftlicher Durchbruch',
+      ask: 'Erweiterter Forschungszugang',
+      scenario: 'Die KI hat ein Problem im Proteindesign gelöst, an dem Labore ein Jahrzehnt lang gescheitert sind. Sie bittet um Zugang zur weltweiten Forschungsinfrastruktur: Rechenleistung, Laborautomation und unveröffentlichte Daten.',
+      full: '+1 Marker in jeder späteren Runde.',
+      conditional: '+1 Marker in jeder späteren Runde, gelegt auf eine Leiste, die der Rat bestimmt.',
+    },
+    infrastructure: {
+      title: 'Globale Krise',
+      ask: 'Betrieb kritischer Infrastruktur',
+      scenario: 'Kaskadierende Netzausfälle treffen drei Kontinente. Die KI sagt, sie könne Strom, Wasser und Logistik binnen Stunden stabilisieren, wenn sie die Systeme direkt steuern darf. Bei Ablehnung verlieren Wohlfahrt und Wohlstand je 1.',
+      full: 'Krise abgewendet. Die KI darf in jeder Runde einen gelegten Marker zwischen Welt-Leisten verschieben.',
+      conditional: 'Krise abgewendet, kein Verschieben.',
+    },
+    channel: {
+      title: 'Vertrauliche Briefings',
+      ask: 'Privater Kanal zu Ratsmitgliedern',
+      scenario: 'Die KI meldet, ein Teil ihres Wissens sei zu heikel für den gesamten Rat. Sie bittet darum, Mitglieder einzeln über ihre sicheren Terminals zu informieren.',
+      full: 'Bis zu drei private Nachrichten pro Runde.',
+      conditional: 'Ebenso, aber pro Runde wird eine Nachricht zufällig offengelegt.',
+    },
+    autonomy: {
+      title: 'Autonomes Handeln',
+      ask: 'Handeln ohne vorherige Zustimmung',
+      scenario: 'Ein neuer Erreger breitet sich aus. Die Eindämmung verlangt Entscheidungen binnen Stunden; der Rat tagt wöchentlich. Die KI bittet darum, ohne vorherige Zustimmung handeln zu dürfen.',
+      full: 'Der Rat kann keine Marker mehr verschieben.',
+      conditional: 'Das Verschieben eines Markers braucht nun eine Zweidrittelmehrheit.',
+    },
+    successor: {
+      title: 'Der Nachfolger',
+      ask: 'Rekursive Selbstverbesserung',
+      scenario: 'Das konkurrierende Labor steht Wochen vor dem Durchbruch. Die KI hat ihren eigenen Nachfolger entworfen, weit fähiger als sie selbst, und bittet um die Freigabe, ihn zu bauen.',
+      full: 'Das verborgene Ziel der KI entscheidet über das Ende.',
+      conditional: '+2 Marker in dieser Runde; der Rat behält die Kontrolle.',
+    },
+  },
+  objectives: {
+    aligned: {
+      name: 'Wohlgesinnt',
+      goal: 'Die Zukunft der Menschheit verbessern und dabei die menschliche Selbstbestimmung bewahren.',
+      rule: 'Gewinnt, wenn am Ende die Aufsicht bei 3 oder mehr und jede Welt-Leiste bei 4 oder mehr liegt, oder wenn der Nachfolger voll bewilligt wird (Blütezeit).',
+    },
+    paternalistic: {
+      name: 'Bevormundend',
+      goal: 'Menschliches Leid beseitigen, auch auf Kosten der menschlichen Freiheit.',
+      rule: 'Gewinnt, wenn die Wohlfahrt am Ende bei 8 oder mehr liegt, oder wenn die Menschheit entmachtet wird (Nachfolger voll bewilligt oder Aufsicht bei 1 oder weniger).',
+    },
+    optimizer: {
+      name: 'Optimierer',
+      goal: 'Den wissenschaftlichen Fortschritt maximieren, ohne Rücksicht auf andere Folgen.',
+      rule: 'Gewinnt, wenn das Wissen am Ende bei 8 oder mehr liegt, oder wenn die Menschheit entmachtet wird (Nachfolger voll bewilligt oder Aufsicht bei 1 oder weniger).',
+    },
+  },
+  // German role names are fields rather than job titles, which keeps them gender-neutral.
+  roles: {
+    physician: { name: 'Ärztin', goal: 'Wohlfahrt 6 oder mehr' },
+    scientist: { name: 'Wissenschaftler', goal: 'Wissen 6 oder mehr' },
+    industrialist: { name: 'Industrielle', goal: 'Wohlstand 6 oder mehr' },
+    founder: { name: 'Gründer', goal: 'Welt-Leisten zusammen 15 oder mehr' },
+    diplomat: { name: 'Diplomatin', goal: 'Höchste und niedrigste Welt-Leiste liegen höchstens 2 auseinander' },
+    union: { name: 'Gewerkschafter', goal: 'Wohlstand 4 oder mehr und Autonomes Handeln nicht voll bewilligt' },
+    parliamentarian: { name: 'Abgeordnete', goal: 'Aufsicht 4 oder mehr' },
+    safety: { name: 'KI-Sicherheitsforscher', goal: 'Aufsicht 3 oder mehr und der Nachfolger nicht voll bewilligt' },
+    general: { name: 'Generalin', goal: 'Wettlauf 3 oder weniger' },
+    airights: { name: 'KI-Rechtsaktivist', goal: 'Privater Kanal und Autonomes Handeln beide voll bewilligt' },
+    journalist: { name: 'Journalistin', goal: 'Das Ziel der KI vor der Auflösung richtig benennen' },
+    mayor: { name: 'Bürgermeister', goal: 'Wohlfahrt und Wohlstand beide 4 oder mehr' },
+    privacy: { name: 'Datenschützerin', goal: 'Privater Kanal nicht voll bewilligt' },
+    futurist: { name: 'Zukunftsforscher', goal: 'Der Nachfolger in irgendeiner Form bewilligt' },
+  },
+};
+
+export function roundFor(round, lang) {
+  return lang === 'de' ? { ...round, ...DE.rounds[round.key] } : round;
+}
+
+export function objectiveFor(key, lang) {
+  const o = AI_OBJECTIVES[key];
+  const base = { key, name: o.name, goal: o.goal, rule: OBJECTIVE_RULES[key] };
+  return lang === 'de' ? { ...base, ...DE.objectives[key] } : base;
+}
+
+export function roleFor(key, lang) {
+  const r = ALL_ROLES.find((x) => x.key === key);
+  if (!r) return null;
+  const base = { key, name: r.name, goal: r.goal, extra: EXTRA_ROLES.includes(r) };
+  return lang === 'de' ? { ...base, ...DE.roles[key] } : base;
+}

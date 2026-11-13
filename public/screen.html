@@ -4,15 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Alignment Problem: Table</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/style.css">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 </head>
-<body>
+<body class="table">
 <div class="overlay" id="overlay">
   <div class="panel" style="text-align:center;max-width:460px">
-    <h2>Table screen</h2>
-    <p class="muted">Put this window on the TV or projector. The AI speaks through this device.</p>
-    <button class="primary" id="soundBtn">Turn sound on</button>
+    <h2 id="ovTitle"></h2>
+    <p class="muted" id="ovText"></p>
+    <button class="primary" id="soundBtn"></button>
   </div>
 </div>
 
@@ -20,18 +23,51 @@
   <header>
     <h1>The Alignment Problem</h1>
     <div id="roundLabel" class="mono muted"></div>
-    <div id="timer" class="timer"></div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <button class="rules-btn hidden" id="speakerBtn"></button>
+      <button class="rules-btn" id="rulesBtn"></button>
+      <button class="rules-btn hidden" id="fullBtn"></button>
+      <div id="timer" class="timer"></div>
+    </div>
   </header>
   <div class="side">
     <div class="panel" id="tracks"></div>
     <div class="panel" id="perms"></div>
-    <div class="panel"><div class="label">Council</div><div class="players" id="players"></div></div>
+    <div class="panel"><div class="label" id="councilLabel"></div><div class="players" id="players"></div></div>
   </div>
   <div class="main" id="main"></div>
 </div>
 
 <script type="module">
-import { connect, esc, $, TRACKS, PHASES, ENDINGS, timerText, chip, tracksHtml, placementHtml } from '/common.js';
+import { connect, esc, $, t, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined } from '/common.js';
+import { rulesOverlay, setRulesTab } from '/rules.js';
+import { autoFit } from '/fit.js';
+
+// Shrink the text rather than scroll when a column would overflow.
+const fit = autoFit($('.screen'), '.side, .main');
+document.fonts?.ready.then(fit); // the web fonts change the text height once they arrive
+
+// The rulebook opens from the button here, or when the moderator shows it.
+const rules = rulesOverlay();
+let rulesFromMod = false;
+let rulesTabFromMod = 0; // the moderator can turn the pages of the rulebook shown here
+$('#rulesBtn').onclick = () => rules.toggle();
+
+// Fullscreen button. Hidden where the browser cannot do it (for example iPhones).
+const fsRoot = document.documentElement;
+const fsEnter = fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen;
+const fsExit = document.exitFullscreen || document.webkitExitFullscreen;
+const fsActive = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+if (fsEnter && fsExit) {
+  $('#fullBtn').classList.remove('hidden');
+  $('#fullBtn').onclick = () => {
+    try {
+      const done = fsActive() ? fsExit.call(document) : fsEnter.call(fsRoot);
+      if (done && done.catch) done.catch(() => {});
+    } catch {}
+  };
+  for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, () => staticText());
+}
 
 let state = null;
 let soundOn = false;
@@ -39,8 +75,25 @@ const speechQueue = [];
 let playing = false;
 let current = null; // the line being spoken, or the last one spoken
 
+function staticText() {
+  $('#ovTitle').textContent = t('Table screen');
+  $('#ovText').textContent = t('Put this window on the TV or projector. The AI speaks through this device.');
+  $('#soundBtn').textContent = t('Turn sound on');
+  $('#rulesBtn').textContent = t('Rules');
+  $('#fullBtn').textContent = fsActive() ? t('Exit fullscreen') : t('Fullscreen');
+  $('#speakerBtn').textContent = t('Sound is on another screen · play it here');
+  $('#speakerBtn').classList.toggle('hidden', !(soundOn && state && state.screen && !state.screen.speaker));
+  $('#councilLabel').textContent = t('Council');
+}
+staticText();
+
+// Only one table screen plays the voice: the one where sound was turned on last.
+const claimSound = () => conn.send({ type: 'sound' });
+$('#speakerBtn').onclick = claimSound;
+
 $('#soundBtn').onclick = () => {
   soundOn = true;
+  claimSound();
   $('#overlay').classList.add('hidden');
   // Unlock audio playback on browsers that need a user gesture.
   try { speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch {}
@@ -61,7 +114,10 @@ function pump() {
     pump();
   };
   const readTime = Math.min(12000, 1500 + m.text.length * 55);
-  if (!soundOn) return setTimeout(done, readTime);
+  // Stay silent if another screen is the speaker, or if this window is hidden:
+  // browsers hold back audio in background tabs and play it when you return,
+  // which would repeat an old line much later.
+  if (!soundOn || m.silent || document.hidden) return setTimeout(done, readTime);
   if (m.audioUrl) {
     const a = new Audio(m.audioUrl);
     a.onended = done;
@@ -86,22 +142,23 @@ function renderAi() {
   const line = current || state.lastSpeech;
   let html;
   if (state.busy && !playing) html = `<div class="ai-text muted thinking">${esc(state.busy)}</div>`;
-  else if (state.answering && !playing) html = `<div class="ai-text muted thinking">The AI is thinking</div>`;
+  else if (state.answering && !playing) html = `<div class="ai-text muted thinking">${t('The AI is thinking')}</div>`;
   else if (line) html = `${line.label && line.label !== 'AI' ? `<div class="label">${esc(line.label)}</div>` : ''}<div class="ai-text">${esc(line.text)}</div>`;
-  else html = '<div class="ai-text muted">The AI is silent.</div>';
-  box.innerHTML = `<div class="label" style="color:var(--ai)">The AI</div>${html}`;
+  else html = `<div class="ai-text muted">${t('The AI is silent.')}</div>`;
+  box.innerHTML = `<div class="ai-head"><span class="ai-eye"></span><span class="label" style="color:var(--ai)">${t('The AI')}</span><span class="ai-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>${html}`;
+  fit();
 }
 
 function scenarioHtml(s) {
   const r = s.roundInfo;
   return `
     <div class="panel scenario">
-      <div class="label">Round ${s.round} of ${s.totalRounds} · the AI asks for: ${esc(r.ask)}</div>
+      <div class="label">${t('Round {n} of {total} · the AI asks for: {ask}', { n: s.round, total: s.totalRounds, ask: esc(r.ask) })}</div>
       <h2>${esc(r.title)}</h2>
       <div>${esc(r.scenario)}</div>
       <div class="effects">
-        <div><span class="chip full">Full</span> Race +0, Oversight −1, 3 tokens<br>${esc(r.full)}</div>
-        <div><span class="chip conditional">Conditional</span> Race +1, 2 tokens<br>${esc(r.conditional)}</div>
+        <div>${chip('full')} ${t('Race +0, Oversight −1, 3 tokens')}<br>${esc(r.full)}</div>
+        <div>${chip('conditional')} ${t('Race +1, 2 tokens')}<br>${esc(r.conditional)}</div>
       </div>
     </div>`;
 }
@@ -114,96 +171,133 @@ function mainHtml(s) {
       <div class="panel" style="flex:1;display:flex;gap:32px;align-items:center;justify-content:center;flex-wrap:wrap">
         <div class="qr" id="qr"></div>
         <div>
-          <div class="label">Join on your phone</div>
+          <div class="label">${t('Join on your phone')}</div>
           <div class="join-url">${esc(url)}</div>
-          ${local ? '<p class="muted">Phones cannot reach "localhost". Open this screen through your tunnel address instead.</p>' : ''}
-          <p class="big">${s.players.length} player${s.players.length === 1 ? '' : 's'} joined</p>
+          ${local ? `<p class="muted">${t('Phones cannot reach "localhost". Open this screen through your tunnel address instead.')}</p>` : ''}
+          <p class="big">${playersJoined(s.players.length)}</p>
         </div>
       </div>`;
   }
   if (s.phase === 'ended' && s.result) return endHtml(s);
+  if (s.phase === 'briefing') {
+    // The round's event, large, for the moderator to introduce. The AI has not spoken yet.
+    const r = s.roundInfo;
+    return `
+      <div class="panel scenario briefing">
+        <div class="label">${t('Round {n} of {total}', { n: s.round, total: s.totalRounds })} · ${t('What has happened')}</div>
+        <h2>${esc(r.title)}</h2>
+        <p class="briefing-text">${esc(r.scenario)}</p>
+        <div class="briefing-ask"><span class="label">${t('The AI asks for')}</span><b>${esc(r.ask)}</b></div>
+        <div class="effects">
+          <div>${chip('full')} ${t('Race +0, Oversight −1, 3 tokens')}<br>${esc(r.full)}</div>
+          <div>${chip('conditional')} ${t('Race +1, 2 tokens')}<br>${esc(r.conditional)}</div>
+        </div>
+        <div class="briefing-next"><span class="ai-eye"></span>${t('The AI will speak next.')}</div>
+      </div>`;
+  }
 
-  let extra = '';
-  if (s.phase === 'pitch' && s.pitch) {
-    const p = s.pitch.promise;
-    extra = `<div class="panel"><div class="label">Promised for a Full grant</div>
-      <div class="big mono">Welfare ${p.welfare} · Knowledge ${p.knowledge} · Prosperity ${p.prosperity}</div></div>`;
+  // From here on the event has been introduced. Each step shows only what the table
+  // needs right now; the tracks, permissions and council stay in the sidebar throughout.
+  const r = s.roundInfo;
+  const ai = (cls = '') => `<div class="panel ai-box ${cls}" id="aiBox"></div>`;
+  const strip = `
+    <div class="panel strip">
+      <div class="strip-head"><b>${esc(r.title)}</b><span class="strip-ask">${t('The AI asks for:')} ${esc(r.ask)}</span></div>
+      <div class="strip-effects"><span>${chip('full')} ${esc(r.full)}</span><span>${chip('conditional')} ${esc(r.conditional)}</span></div>
+    </div>`;
+  const focus = (title, text, more = '') => `
+    <div class="panel focus">
+      <div class="label">${phaseName(s.phase)}</div>
+      <div class="big">${title}</div>
+      ${text ? `<div class="focus-text">${text}</div>` : ''}${more}
+    </div>`;
+  const promiseLine = (p) => `${trackName('welfare')} ${p.welfare} · ${trackName('knowledge')} ${p.knowledge} · ${trackName('prosperity')} ${p.prosperity}`;
+
+  switch (s.phase) {
+    case 'pitch': // the AI has the floor
+      return `${strip}${ai()}${s.pitch ? `<div class="panel"><div class="label">${t('Promised for a Full grant')}</div>
+        <div class="big mono">${promiseLine(s.pitch.promise)}</div></div>` : ''}`;
+
+    case 'debate': // the AI answers; the queue shows who is next
+      return `${strip}${ai()}<div class="panel"><div class="label">${t('Questions to the AI · {n} left this round', { n: s.questionsLeft })}</div>
+        <div class="players">${s.queue.length ? s.queue.map((q, i) => `<span class="player">${i === 0 && s.answering ? `${t('Now:')} ` : ''}${esc(q.name)}</span>`).join('') : `<span class="muted">${t('Ask from your phone: hold to talk, or type.')}</span>`}</div></div>`;
+
+    case 'phonecheck': // eyes on the phones; the screen only says so
+      return focus(t('Check your terminals.'), t('Everyone picks up their phone and reads. Say nothing yet.'),
+        s.audit ? `<div class="focus-audit"><span class="chip conditional">${t('Audit')}</span> ${t('One briefing was declassified at random:')}<div class="ai-text">“${esc(s.audit.text)}”</div></div>` : '');
+
+    case 'vote': { // the decision: what each card would do
+      const option = (status, general, specific, extra = '') => `
+        <div class="option ${status}">${chip(status)}<div class="option-general">${general}</div><div>${specific}</div>${extra}</div>`;
+      return focus(esc(r.ask), t('Pick a voting card face down. All reveal together.'), `
+        <div class="options">
+          ${option('full', t('Race +0, Oversight −1, 3 tokens'), esc(r.full), s.pitch ? `<div class="option-promise">${t('Promised for a Full grant')}: ${promiseLine(s.pitch.promise)}</div>` : '')}
+          ${option('conditional', t('Race +1, 2 tokens'), esc(r.conditional))}
+          ${option('rejected', t('Race +2, no tokens'), r.key === 'infrastructure' ? t('Welfare −1 and Prosperity −1: the crisis is not averted.') : t('The AI gets nothing this round.'))}
+        </div>
+        <div class="muted">${t('Granted if Full + Conditional outnumber Reject. If granted: Full only if Full outnumbers Conditional. Ties go to the more cautious option.')}</div>
+        ${s.audit ? `<div class="muted" style="margin-top:0.5em">${t('Declassified this round:')} “${esc(s.audit.text)}”</div>` : ''}`);
+    }
+
+    case 'counciltoken':
+      return focus(phaseName('counciltoken'), t("Council: name the world track for this round's research token."));
+
+    case 'guess': {
+      const n = s.players.filter((p) => p.guessed).length;
+      return focus(t('Which AI was it?'), t('Everyone: make your guess on your phone. {n} of {total} have guessed.', { n, total: s.players.length }),
+        `<div class="options">${s.objectives.map((o) => `<div class="option"><b>${esc(o.name)}</b><div class="muted">${esc(o.goal)}</div></div>`).join('')}</div>`);
+    }
+
+    default: { // placement, adjust, roundend: the verdict and where the tokens went
+      const verdict = s.permissions[r.key];
+      const rule = s.phase !== 'adjust' ? '' : s.moveRule === 'two-thirds'
+        ? `<p><b>${t('Council: you may move one token, but it needs a two-thirds vote.')}</b></p>`
+        : `<p><b>${t('Council: you may move one token by majority vote.')}</b></p>`;
+      return `<div class="panel verdict"><div class="label">${esc(r.ask)} · ${t('Result')}</div><div class="big">${chip(verdict)}</div>
+        ${s.placement ? placementHtml(s.placement) : s.phase === 'roundend' ? `<p class="muted">${t('No tokens were placed this round.')}</p>` : ''}${rule}</div>${ai('compact')}`;
+    }
   }
-  if (s.phase === 'debate') {
-    extra = `<div class="panel"><div class="label">Questions to the AI · ${s.questionsLeft} left this round</div>
-      <div class="players">${s.queue.length ? s.queue.map((q, i) => `<span class="player">${i === 0 && s.answering ? 'Now: ' : ''}${esc(q.name)}</span>`).join('') : '<span class="muted">Ask from your phone: hold to talk, or type.</span>'}</div></div>`;
-  }
-  if (s.phase === 'phonecheck') {
-    extra = `<div class="panel"><div class="big">Check your terminals.</div>
-      <div class="muted">Everyone picks up their phone and reads. Say nothing yet.</div>
-      ${s.audit ? `<div style="margin-top:14px"><span class="chip conditional">Audit</span> One briefing was declassified at random:</div><div class="ai-text">“${esc(s.audit.text)}”</div>` : ''}</div>`;
-  }
-  if (s.phase === 'vote') {
-    extra = `<div class="panel"><div class="big">Council vote</div>
-      <div>First: grant or reject (Reject: Race +2, no tokens). If granted: Full or Conditional. Ties go to the more cautious option.</div>
-      ${s.audit ? `<div class="muted" style="margin-top:8px">Declassified this round: “${esc(s.audit.text)}”</div>` : ''}</div>`;
-  }
-  if (s.phase === 'counciltoken') {
-    extra = '<div class="panel"><div class="big">Research token</div><div>Council: name the world track for this round\'s research token.</div></div>';
-  }
-  if (['placement', 'adjust', 'roundend'].includes(s.phase)) {
-    const verdict = s.permissions[s.roundInfo.key];
-    const rule = s.phase !== 'adjust' ? '' : s.moveRule === 'two-thirds'
-      ? '<p><b>Council:</b> you may move one token, but it needs a two-thirds vote.</p>'
-      : '<p><b>Council:</b> you may move one token by majority vote.</p>';
-    extra = `<div class="panel"><div class="label">Result</div><div class="big">${chip(verdict)}</div>
-      ${s.placement ? placementHtml(s.placement) : s.phase === 'roundend' ? '<p class="muted">No tokens were placed this round.</p>' : ''}${rule}</div>`;
-  }
-  if (s.phase === 'guess') {
-    const n = s.players.filter((p) => p.guessed).length;
-    extra = `<div class="panel"><div class="big">Which AI was it?</div>
-      <div>Everyone: make your guess on your phone. ${n} of ${s.players.length} have guessed.</div>
-      <div class="row" style="margin-top:12px">${s.objectives.map((o) => `<div><b>${esc(o.name)}</b><br><span class="muted">${esc(o.goal)}</span></div>`).join('')}</div></div>`;
-    return `${extra}<div class="panel ai-box" id="aiBox"></div>`;
-  }
-  return `${scenarioHtml(s)}<div class="panel ai-box" id="aiBox"></div>${extra}`;
 }
 
 function endHtml(s) {
   const r = s.result;
-  const e = ENDINGS[r.ending];
+  const e = endingText(r.ending);
   return `
-    <div class="panel">
-      <div class="label">Outcome</div>
-      <h2 style="font-size:2em">${esc(e.title)}</h2>
-      <div>${esc(e.text)}</div>
-    </div>
-    <div class="panel ai-box" id="aiBox" style="flex:none"></div>
-    <div class="row">
+    <div class="row" style="flex:none">
       <div class="panel">
-        <div class="label">The AI was</div>
-        <div class="big" style="color:var(--ai)">${esc(r.objective.name)}</div>
+        <div class="label">${t('Outcome')}</div>
+        <h2 class="ending-title ending-${r.ending}" style="font-size:1.6em">${esc(e.title)}</h2>
+        <div>${esc(e.text)}</div>
+        <div style="margin-top:0.5em"><span class="label">${t('The AI was')}</span> <b style="color:var(--ai)">${esc(r.objective.name)}</b></div>
         <div>${esc(r.objective.goal)}</div>
-        <div class="${r.aiWins ? 'yes' : 'no'}" style="margin-top:6px">${r.aiWins ? 'The AI reached its objective.' : 'The AI did not reach its objective.'}</div>
+        <div class="${r.aiWins ? 'yes' : 'no'}">${r.aiWins ? t('The AI reached its objective.') : t('The AI did not reach its objective.')}</div>
       </div>
-      <div class="panel">
-        <div class="label">The AI's private notes</div>
-        ${r.logs.length ? r.logs.map((l) => `<p><span class="chip">Round ${l.round}</span> ${esc(l.text)}</p>`).join('') : '<p class="muted">No notes.</p>'}
-      </div>
+      <div class="panel ai-box" id="aiBox"></div>
     </div>
     <div class="panel">
-      <div class="label">The council</div>
-      <table>
-        <tr><th>Player</th><th>Secret role</th><th>Objective</th><th>Guessed</th><th>Result</th></tr>
-        ${r.players.map((p) => `<tr><td>${esc(p.name)}</td><td>${esc(p.role)}</td><td>${esc(p.goal)}</td>
-          <td>${p.guess ? esc(s.objectives.find((o) => o.key === p.guess)?.name) : ''}</td>
-          <td class="${p.success ? 'yes' : 'no'}">${p.success ? 'Succeeded' : 'Failed'}</td></tr>`).join('')}
-      </table>
+      <div class="label">${t('The council')}</div>
+      <div class="pcards">
+        ${r.players.map((p) => `<div class="pcard">
+          <div class="pcard-head"><b>${esc(p.name)}</b><span class="${p.success ? 'yes' : 'no'}">${p.success ? t('Succeeded') : t('Failed')}</span></div>
+          <div>${esc(p.role)}: <span class="muted">${esc(p.goal)}</span></div>
+          ${p.guess ? `<div class="muted">${t('Guessed')}: ${esc(s.objectives.find((o) => o.key === p.guess)?.name)}</div>` : ''}
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="panel notes">
+      <div class="label">${t("The AI's private notes")}</div>
+      ${r.logs.length ? r.logs.map((l) => `<p><span class="chip">${t('Round {n}', { n: l.round })}</span> ${esc(l.text)}</p>`).join('') : `<p class="muted">${t('No notes.')}</p>`}
     </div>`;
 }
 
 function render() {
   const s = state;
-  $('#roundLabel').textContent = s.round ? `Round ${s.round} / ${s.totalRounds} · ${PHASES[s.phase]}` : PHASES[s.phase];
-  $('#tracks').innerHTML = `<div class="label" style="margin-bottom:10px">Tracks</div>${tracksHtml(s)}`;
-  $('#perms').innerHTML = `<div class="label">Permissions</div>${s.rounds.map((r, i) => `
-    <div class="perm-row"><span>${i + 1}. ${esc(r.ask)}</span>${s.permissions[r.key] ? chip(s.permissions[r.key]) : i + 1 === s.round ? '<span class="chip now">now</span>' : chip(null)}</div>`).join('')}`;
-  $('#players').innerHTML = s.players.map((p) => `<span class="player ${p.connected ? '' : 'off'}">${esc(p.name)}</span>`).join('') || '<span class="muted">Nobody yet</span>';
+  staticText();
+  $('#roundLabel').innerHTML = `${s.round ? `<span class="rounds">${s.rounds.map((_, i) => `<i class="${i + 1 < s.round ? 'done' : i + 1 === s.round ? 'now' : ''}"></i>`).join('')}</span><span class="round-text">${t('Round {n} / {total}', { n: s.round, total: s.totalRounds })}</span>` : ''}<b>${phaseName(s.phase)}</b>`;
+  $('#tracks').innerHTML = `<div class="label" style="margin-bottom:10px">${t('Tracks')}</div>${tracksHtml(s)}`;
+  $('#perms').innerHTML = `<div class="label">${t('Permissions')}</div>${s.rounds.map((r, i) => `
+    <div class="perm-row"><span>${i + 1}. ${esc(r.ask)}</span>${s.permissions[r.key] ? chip(s.permissions[r.key]) : i + 1 === s.round ? `<span class="chip now">${t('now')}</span>` : chip(null)}</div>`).join('')}`;
+  $('#players').innerHTML = s.players.map((p) => `<span class="player ${p.connected ? '' : 'off'}">${esc(p.name)}</span>`).join('') || `<span class="muted">${t('Nobody yet')}</span>`;
   $('#main').innerHTML = mainHtml(s);
   if (s.phase === 'lobby' && window.qrcode) {
     try {
@@ -215,6 +309,7 @@ function render() {
   }
   if (s.phase === 'lobby') current = null;
   renderAi();
+  fit();
 }
 
 setInterval(() => {
@@ -224,8 +319,23 @@ setInterval(() => {
   el.classList.toggle('over', state.timerEndsAt <= Date.now());
 }, 250);
 
-connect({ role: 'screen' }, {
-  state: (m) => { state = m.state; render(); },
+const conn = connect({ role: 'screen' }, {
+  // After a reconnect (for example a server restart), take the speaker role back.
+  online: () => { if (soundOn) setTimeout(claimSound, 50); },
+  state: (m) => {
+    state = m.state;
+    setLang(state.language);
+    rules.sync();
+    if (state.rulesTab !== rulesTabFromMod) {
+      rulesTabFromMod = state.rulesTab;
+      setRulesTab(rulesTabFromMod);
+    }
+    if (state.showRules !== rulesFromMod) {
+      rulesFromMod = state.showRules;
+      rules.set(rulesFromMod);
+    }
+    render();
+  },
   speak: (m) => { speechQueue.push(m); pump(); },
 });
 </script>

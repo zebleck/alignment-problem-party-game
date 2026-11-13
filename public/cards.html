@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Alignment Problem: Voting cards</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/print.css">
+</head>
+<body class="paper">
+<div class="toolbar">
+  <h2 id="title"></h2>
+  <button class="rules-btn" id="en">English</button>
+  <button class="rules-btn" id="de">Deutsch</button>
+  <button class="rules-btn" id="print"></button>
+</div>
+<div id="body"></div>
+<script type="module">
+import { $, t, setLang } from '/common.js';
+import { loadRules } from '/rules.js';
+import { cardsHtml } from '/print.js';
+
+// Opens in the table's current language; ?lang=de or the buttons override it.
+const q = new URLSearchParams(location.search);
+async function show(lang) {
+  const r = await loadRules(lang);
+  setLang(r.language);
+  $('#title').textContent = t('Voting cards');
+  $('#print').textContent = t('Print');
+  $('#en').classList.toggle('selected', r.language === 'en');
+  $('#de').classList.toggle('selected', r.language === 'de');
+  $('#body').innerHTML = cardsHtml(r, Number(q.get('sets')) || 15);
+  document.body.dataset.ready = r.language;
+}
+$('#en').onclick = () => show('en');
+$('#de').onclick = () => show('de');
+$('#print').onclick = () => print();
+show(q.get('lang') || 'table');
+</script>
+</body>
+</html>

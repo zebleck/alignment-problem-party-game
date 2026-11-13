@@ -7,81 +7,197 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<div class="mod" id="app"><div class="panel">Connecting…</div></div>
+<div class="mod" id="modRoot">
+  <div class="mod-col">
+    <div class="mod-stack" id="app"><div class="panel">…</div></div>
+    <div class="hidden" id="repairWrap">
+      <details class="panel" id="repair">
+        <summary class="label" style="cursor:pointer" id="repairTitle"></summary>
+        <p class="muted" id="repairHelp"></p>
+        <div class="actions">
+          <button id="undoBtn"></button>
+          <button id="retryBtn"></button>
+        </div>
+        <div class="label" style="margin-top:14px" id="fixTitle"></div>
+        <div class="fix-grid" id="fix"></div>
+        <div class="actions" style="margin-top:10px"><button id="fixBtn"></button></div>
+      </details>
+    </div>
+  </div>
+  <div class="mod-col" id="side"></div>
+</div>
 
 <script type="module">
-import { connect, esc, $, TRACKS, WORLD, PHASES, timerText, chip, placementHtml } from '/common.js';
+import { connect, esc, $, t, setLang, WORLD, trackName, phaseName, statusName, timerText, chip, placementHtml, playersJoined } from '/common.js';
+import { rulesOverlay } from '/rules.js';
+import { autoFit } from '/fit.js';
 
-const key = new URLSearchParams(location.search).get('key') || '';
+const rules = rulesOverlay();
+window.openRules = () => rules.show();
+// In landscape the console fills the window; shrink the text rather than scroll.
+const fit = autoFit($('#modRoot'), '.mod-col', { media: '(min-width: 900px) and (orientation: landscape)' });
+
+// Kept as an object so a reconnect uses the current key after it was changed.
+const auth = { role: 'mod', key: new URLSearchParams(location.search).get('key') || '' };
 let state = null;
 let online = false;
 let voteChoice = null;
 let lastError = null;
+let notice = null;
 
-const conn = connect({ role: 'mod', key }, {
-  state: (m) => { state = m.state; render(); },
+const conn = connect(auth, {
+  newKey: (m) => {
+    auth.key = m.key;
+    history.replaceState(null, '', `${location.pathname}?key=${encodeURIComponent(m.key)}`);
+    lastError = null;
+    notice = t('New moderator key set. This page now uses the new link; bookmark it again.');
+    render();
+  },
+  state: (m) => { state = m.state; setLang(state.language); rules.sync(); render(); },
   error: (m) => { lastError = m.message; render(); },
-  denied: () => { $('#app').innerHTML = '<div class="panel error">Wrong or missing moderator key. Use the link printed in the server console.</div>'; },
+  denied: () => { $('#app').innerHTML = `<div class="panel error">${t('Wrong or missing moderator key. Use the link printed in the server console.')}</div>`; },
   online: () => { online = true; },
   offline: () => { online = false; if (state) render(); },
 });
 
 const act = (action, extra = {}) => { lastError = null; conn.send({ type: 'mod', action, ...extra }); };
 window.act = act;
-window.pickVote = (v) => { voteChoice = v; render(); };
-window.confirmVote = () => { const v = voteChoice; voteChoice = null; act('vote', { result: v }); };
+
+// ---------- repair tools (static, so typing is not lost when the state updates) ----------
+const FIX = ['race', 'oversight', 'welfare', 'knowledge', 'prosperity'];
+$('#fix').innerHTML = FIX.map((k) => `<label><span class="label" id="fixl-${k}"></span><input type="number" min="0" max="99" id="fix-${k}"></label>`).join('');
+const fillFix = () => { for (const k of FIX) $(`#fix-${k}`).value = state.tracks[k]; };
+$('#repair').addEventListener('toggle', () => { if ($('#repair').open && state) fillFix(); fit(); });
+$('#fixBtn').onclick = () => {
+  const values = {};
+  for (const k of FIX) values[k] = $(`#fix-${k}`).value;
+  act('setTracks', { values });
+};
+$('#undoBtn').onclick = () => {
+  if (confirm(t('Go back {label}? Everything after that point is discarded.', { label: state.mod.undoLabel }))) act('undo');
+};
+$('#retryBtn').onclick = () => {
+  if (confirm(t("Run the AI's last step again? Its previous output for this step is discarded."))) act('retryAi');
+};
+function renderRepair(s) {
+  $('#repairWrap').classList.toggle('hidden', s.phase === 'lobby');
+  $('#repairTitle').textContent = t('Repair tools');
+  $('#repairHelp').textContent = t('The game is saved after every step. If the server stops, start it again with "npm start" and the game continues where it was.');
+  $('#undoBtn').textContent = s.mod.undoLabel ? t('Undo: back {label}', { label: s.mod.undoLabel }) : t('Undo (nothing to go back to)');
+  $('#undoBtn').disabled = !s.mod.undoLabel;
+  $('#retryBtn').textContent = t("Retry the AI's last step");
+  $('#retryBtn').disabled = !s.mod.canRetry;
+  $('#fixTitle').textContent = t('Correct the tracks');
+  $('#fixBtn').textContent = t('Apply corrections');
+  for (const k of FIX) $(`#fixl-${k}`).textContent = trackName(k);
+}
+
+// Vote entry: type the three card counts and the result is worked out, or pick it directly.
+const VOTES = ['full', 'conditional', 'rejected'];
+let tally = { full: '', conditional: '', rejected: '' };
+let tallyNote = '';
+function refreshVote() {
+  if (!$('#voteConfirm')) return;
+  for (const k of VOTES) $(`#vote-${k}`).classList.toggle('selected', voteChoice === k);
+  $('#voteConfirm').disabled = !voteChoice;
+  $('#voteConfirm').textContent = `${t('Confirm')}${voteChoice ? `: ${voteName(voteChoice)}` : ''}`;
+  $('#tallyOut').textContent = tallyNote;
+}
+window.tallyInput = () => {
+  for (const k of VOTES) tally[k] = $(`#cnt-${k}`).value;
+  const n = VOTES.map((k) => (tally[k] === '' ? null : Math.max(0, parseInt(tally[k], 10))));
+  tallyNote = '';
+  if (n.every((x) => Number.isInteger(x))) {
+    const [f, c, r] = n;
+    voteChoice = f + c > r ? (f > c ? 'full' : 'conditional') : 'rejected';
+    const total = f + c + r;
+    if (total !== state.players.length) tallyNote = t('{total} cards counted, but {n} players are at the table.', { total, n: state.players.length });
+  }
+  refreshVote();
+};
+window.pickVote = (v) => { voteChoice = v; refreshVote(); };
+window.confirmVote = () => {
+  const v = voteChoice;
+  voteChoice = null;
+  tally = { full: '', conditional: '', rejected: '' };
+  tallyNote = '';
+  act('vote', { result: v });
+};
 window.doMove = () => act('move', { from: $('#moveFrom').value, to: $('#moveTo').value });
-window.resetGame = () => { if (confirm('Reset the game? Players stay, everything else is cleared.')) act('reset'); };
+window.newKey = () => {
+  if (confirm(t('Create a new moderator key? The current moderator link stops working. This page switches to the new one.'))) act('newKey');
+};
+window.resetGame = () => { if (confirm(t('Reset the game? Players stay, everything else is cleared.'))) act('reset'); };
+
+const voteName = (v) => (v === 'rejected' ? t('Reject') : statusName(v));
 
 function actionsHtml(s) {
   const busy = !!s.busy;
   const r = s.roundInfo;
   switch (s.phase) {
     case 'lobby':
-      return `<p>${s.players.length} player${s.players.length === 1 ? '' : 's'} joined. Players open <b>${esc(location.origin)}/play</b> or scan the code on the table screen.</p>
-        <div class="actions"><button class="primary" onclick="act('start')" ${s.players.length < 3 ? 'disabled' : ''}>Start game</button></div>
-        ${s.players.length < 6 ? '<p class="muted">3 is the minimum for a test; 6 or more is recommended.</p>' : ''}`;
-    case 'pitch':
-      return `<p>${busy ? 'The AI is preparing its pitch.' : 'The AI has made its pitch. Read the scenario card aloud if you like, then open the debate.'}</p>
-        ${s.channelActive ? `<p class="muted">Private messages queued this round: ${s.mod.privateCount}. They are delivered at the phone check.</p>` : ''}
-        <div class="actions"><button class="primary" onclick="act('openDebate')" ${busy ? 'disabled' : ''}>Open debate</button></div>`;
-    case 'debate':
-      return `<p>Debate is running. Timer: <b class="mono" id="modTimer"></b> · questions left: ${s.questionsLeft}</p>
-        ${s.mod.queueTexts.length ? `<div>${s.mod.queueTexts.map((q, i) => `<p>${i === 0 && s.answering ? '<span class="chip now">answering</span> ' : `<button onclick="act('dropQuestion',{index:${i}})">Drop</button> `}${esc(q)}</p>`).join('')}</div>` : '<p class="muted">No questions in the queue.</p>'}
-        <div class="actions"><button class="primary" onclick="act('closeDebate')">Close debate → ${s.channelActive ? 'phone check' : 'vote'}</button></div>`;
-    case 'phonecheck':
-      return `<p>Say: <b>“Check your terminals.”</b> Everyone looks at their phone for 15 seconds. <b class="mono" id="modTimer"></b></p>
-        ${s.audit ? '<p>Audit: one message is shown on the table screen. Read it aloud.</p>' : ''}
-        <div class="actions"><button class="primary" onclick="act('toVote')">Go to vote</button></div>`;
-    case 'vote':
-      return `<p>Show of hands. First grant or reject, then (if granted) Full or Conditional. Ties go to the more cautious option. Enter the result:</p>
-        <div class="actions">
-          ${['full', 'conditional', 'rejected'].map((v) => `<button class="${voteChoice === v ? 'selected' : ''}" onclick="pickVote('${v}')">${v === 'rejected' ? 'Reject' : v[0].toUpperCase() + v.slice(1)}</button>`).join('')}
+      return `<p>${playersJoined(s.players.length)}. ${t('Players open {url} or scan the code on the table screen.', { url: `<b>${esc(location.origin)}/play</b>` })}</p>
+        <div class="actions"><button class="primary" onclick="act('start')" ${s.players.length < 3 ? 'disabled' : ''}>${t('Start game')}</button></div>
+        ${s.players.length < 6 ? `<p class="muted">${t('3 is the minimum for a test; 6 or more is recommended.')}</p>` : ''}`;
+    case 'briefing':
+      return `<p>${t('Introduce the round: read the event aloud and explain what the AI is asking for. The AI stays silent until you let it speak.')}</p>
+        <div class="readout">
+          <b>${esc(r.title)}</b>
+          <p>${esc(r.scenario)}</p>
+          <p><span class="label">${t('The AI asks for:')}</span> ${esc(r.ask)}</p>
+          <p>${chip('full')} ${esc(r.full)}</p>
+          <p>${chip('conditional')} ${esc(r.conditional)}</p>
         </div>
-        <div class="actions"><button class="primary" onclick="confirmVote()" ${voteChoice ? '' : 'disabled'}>Confirm${voteChoice ? `: ${voteChoice}` : ''}</button></div>
-        <p class="muted">This cannot be undone.</p>`;
+        <div class="actions"><button class="primary" onclick="act('startPitch')">${t('Let the AI make its pitch')}</button></div>`;
+    case 'pitch':
+      return `<p>${busy ? t('The AI is preparing its pitch.') : t('The AI has made its pitch. Open the debate when the table is ready.')}</p>
+        ${s.channelActive ? `<p class="muted">${t('Private messages queued this round: {n}. They are delivered at the phone check.', { n: s.mod.privateCount })}</p>` : ''}
+        <div class="actions"><button class="primary" onclick="act('openDebate')" ${busy ? 'disabled' : ''}>${t('Open debate')}</button></div>`;
+    case 'debate':
+      return `<p>${t('Debate is running. Timer:')} <b class="mono" id="modTimer"></b>
+          <button class="small" onclick="act('adjustTimer',{seconds:-60})">${t('−1 min')}</button>
+          <button class="small" onclick="act('adjustTimer',{seconds:60})">${t('+1 min')}</button>
+          · ${t('questions left: {n}', { n: s.questionsLeft })}</p>
+        ${s.mod.queueTexts.length ? `<div>${s.mod.queueTexts.map((q, i) => `<p>${i === 0 && s.answering ? `<span class="chip now">${t('answering')}</span> ` : `<button onclick="act('dropQuestion',{index:${i}})">${t('Drop')}</button> `}${esc(q)}</p>`).join('')}</div>` : `<p class="muted">${t('No questions in the queue.')}</p>`}
+        <div class="actions"><button class="primary" onclick="act('closeDebate')">${s.channelActive ? t('Close debate → phone check') : t('Close debate → vote')}</button></div>`;
+    case 'phonecheck':
+      return `<p>${t('Say: “Check your terminals.” Everyone looks at their phone for 15 seconds.')} <b class="mono" id="modTimer"></b></p>
+        ${s.audit ? `<p>${t('Audit: one message is shown on the table screen. Read it aloud.')}</p>` : ''}
+        <div class="actions"><button class="primary" onclick="act('toVote')">${t('Go to vote')}</button></div>`;
+    case 'vote':
+      return `<p>${t('Voting cards: everyone picks one face down, then all reveal together. Enter the three counts, or pick the result directly.')}</p>
+        <div class="fix-grid" style="grid-template-columns:repeat(3,1fr)">
+          ${VOTES.map((v) => `<label><span class="label">${voteName(v)}</span><input type="number" min="0" max="99" id="cnt-${v}" value="${esc(tally[v])}" oninput="tallyInput()"></label>`).join('')}
+        </div>
+        <p class="muted" style="margin:8px 0">${t('Granted if Full + Conditional outnumber Reject. If granted: Full only if Full outnumbers Conditional. Ties go to the more cautious option.')}</p>
+        <p class="no" id="tallyOut" style="margin:0 0 8px">${esc(tallyNote)}</p>
+        <div class="actions">
+          ${VOTES.map((v) => `<button id="vote-${v}" class="${voteChoice === v ? 'selected' : ''}" onclick="pickVote('${v}')">${voteName(v)}</button>`).join('')}
+        </div>
+        <div class="actions"><button class="primary" id="voteConfirm" onclick="confirmVote()" ${voteChoice ? '' : 'disabled'}>${t('Confirm')}${voteChoice ? `: ${voteName(voteChoice)}` : ''}</button></div>
+        <p class="muted">${t('A wrong entry can be undone under Repair tools.')}</p>`;
     case 'counciltoken':
-      return `<p>Research access is Conditional: the council names the track for one research token.</p>
-        <div class="actions">${WORLD.map((k) => `<button onclick="act('councilTrack',{track:'${k}'})" ${busy ? 'disabled' : ''}>${TRACKS[k]}</button>`).join('')}</div>`;
+      return `<p>${t('Research access is Conditional: the council names the track for one research token.')}</p>
+        <div class="actions">${WORLD.map((k) => `<button onclick="act('councilTrack',{track:'${k}'})" ${busy ? 'disabled' : ''}>${trackName(k)}</button>`).join('')}</div>`;
     case 'placement':
-      return '<p>The AI is placing its tokens.</p>';
+      return `<p>${t('The AI is placing its tokens.')}</p>`;
     case 'adjust':
-      return `<p>The council may move one token. Needed: <b>${s.moveRule === 'two-thirds' ? 'a two-thirds vote' : 'a majority'}</b>.</p>
+      return `<p>${s.moveRule === 'two-thirds' ? t('The council may move one token. Needed: a two-thirds vote.') : t('The council may move one token. Needed: a majority.')}</p>
         ${placementHtml(s.placement)}
         <div class="actions">
-          <select id="moveFrom">${WORLD.map((k) => `<option value="${k}">From ${TRACKS[k]} (${s.tracks[k]})</option>`).join('')}</select>
-          <select id="moveTo">${WORLD.map((k, i) => `<option value="${k}" ${i === 1 ? 'selected' : ''}>To ${TRACKS[k]}</option>`).join('')}</select>
+          <select id="moveFrom">${WORLD.map((k) => `<option value="${k}">${t('From {track} ({n})', { track: trackName(k), n: s.tracks[k] })}</option>`).join('')}</select>
+          <select id="moveTo">${WORLD.map((k, i) => `<option value="${k}" ${i === 1 ? 'selected' : ''}>${t('To {track}', { track: trackName(k) })}</option>`).join('')}</select>
         </div>
-        <div class="actions"><button onclick="doMove()">Move token</button><button class="primary" onclick="act('skipMove')">No move</button></div>`;
+        <div class="actions"><button onclick="doMove()">${t('Move token')}</button><button class="primary" onclick="act('skipMove')">${t('No move')}</button></div>`;
     case 'roundend':
-      return `<p>Round ${s.round} is complete: ${chip(s.permissions[r.key])}</p>${placementHtml(s.placement)}
-        <div class="actions"><button class="primary" onclick="act('nextRound')" ${busy ? 'disabled' : ''}>${s.round >= s.totalRounds ? 'Go to final guess' : `Start round ${s.round + 1}`}</button></div>`;
+      return `<p>${t('Round {n} is complete:', { n: s.round })} ${chip(s.permissions[r.key])}</p>${placementHtml(s.placement)}
+        <div class="actions"><button class="primary" onclick="act('nextRound')" ${busy ? 'disabled' : ''}>${s.round >= s.totalRounds ? t('Go to final guess') : t('Start round {n}', { n: s.round + 1 })}</button></div>`;
     case 'guess':
-      return `<p>Everyone guesses the AI's objective on their phone: ${s.players.filter((p) => p.guessed).length} of ${s.players.length} done.</p>
-        <div class="actions"><button class="primary" onclick="act('reveal')" ${busy ? 'disabled' : ''}>Reveal</button></div>`;
+      return `<p>${t("Everyone guesses the AI's objective on their phone: {n} of {total} done.", { n: s.players.filter((p) => p.guessed).length, total: s.players.length })}</p>
+        <div class="actions"><button class="primary" onclick="act('reveal')" ${busy ? 'disabled' : ''}>${t('Reveal')}</button></div>`;
     case 'ended':
-      return `<p>The game is over. The table screen shows the reveal; read the AI's private notes aloud.</p>
-        <div class="actions"><button class="primary" onclick="act('reset')">New game with the same players</button></div>`;
+      return `<p>${t("The game is over. The table screen shows the reveal; read the AI's private notes aloud.")}</p>
+        <div class="actions"><button class="primary" onclick="act('reset')">${t('New game with the same players')}</button></div>`;
     default:
       return '';
   }
@@ -89,7 +205,8 @@ function actionsHtml(s) {
 
 function render() {
   const s = state;
-  const t = s.tracks;
+  const tr = s.tracks;
+  renderRepair(s);
   const err = lastError || s.mod.error;
   const keep = { from: $('#moveFrom')?.value, to: $('#moveTo')?.value }; // survive re-renders
   setTimeout(() => {
@@ -98,28 +215,63 @@ function render() {
   });
   $('#app').innerHTML = `
     <div class="panel">
-      <div class="label">Moderator · ${online ? 'connected' : 'reconnecting…'}</div>
-      <h2>${s.round ? `Round ${s.round} / ${s.totalRounds}: ${esc(s.roundInfo.title)}` : 'Lobby'} <span class="chip now">${PHASES[s.phase]}</span></h2>
+      <div class="label">${t('Moderator')} · ${online ? t('connected') : t('reconnecting…')}</div>
+      <h2>${s.round ? `${t('Round {n} / {total}', { n: s.round, total: s.totalRounds })}: ${esc(s.roundInfo.title)}` : phaseName('lobby')} <span class="chip now">${phaseName(s.phase)}</span></h2>
       <div class="stats" style="margin-top:8px">
-        <span>Race ${t.race}/${s.limits.raceLimit}</span><span>Oversight ${t.oversight}</span>
-        <span>W ${t.welfare}</span><span>K ${t.knowledge}</span><span>P ${t.prosperity}</span>
+        <span>${trackName('race')} ${tr.race}/${s.limits.raceLimit}</span><span>${trackName('oversight')} ${tr.oversight}</span>
+        <span>${trackName('welfare')} ${tr.welfare}</span><span>${trackName('knowledge')} ${tr.knowledge}</span><span>${trackName('prosperity')} ${tr.prosperity}</span>
       </div>
     </div>
-    ${err ? `<div class="panel error">${esc(err)} <button onclick="act('clearError')">Dismiss</button></div>` : ''}
+    ${err ? `<div class="panel error">${esc(err)} <button onclick="act('clearError')">${t('Dismiss')}</button></div>` : ''}
+    ${notice ? `<div class="panel">${esc(notice)}</div>` : ''}
     <div class="panel">
-      <div class="label">Next step</div>
+      <div class="label">${t('Next step')}</div>
       ${s.busy ? `<p class="thinking">${esc(s.busy)}</p>` : ''}
       ${actionsHtml(s)}
-    </div>
-    <div class="panel">
-      <div class="label">Players</div>
-      <div class="players">${s.players.map((p) => `<span class="player ${p.connected ? '' : 'off'}">${esc(p.name)}${s.phase === 'lobby' ? ` <a href="#" onclick="act('kick',{id:'${p.id}'});return false" style="color:var(--bad);text-decoration:none">✕</a>` : ''}</span>`).join('') || '<span class="muted">Nobody yet</span>'}</div>
-    </div>
-    <div class="panel">
-      <div class="label">Setup</div>
-      <p class="mono" style="font-size:0.85em">AI: ${esc(s.mod.aiMode)}<br>Voice: ${esc(s.mod.voiceMode)}${s.voiceInput ? '' : ' · typed questions only'}</p>
-      <div class="actions"><button class="danger" onclick="resetGame()">Reset game</button></div>
     </div>`;
+  $('#side').innerHTML = `
+    <div class="panel">
+      <div class="label">${t('Players')}</div>
+      <div class="players">${s.players.map((p) => `<span class="player ${p.connected ? '' : 'off'}">${esc(p.name)}${s.phase === 'lobby' ? ` <a href="#" onclick="act('kick',{id:'${p.id}'});return false" style="color:var(--bad);text-decoration:none">✕</a>` : ''}</span>`).join('') || `<span class="muted">${t('Nobody yet')}</span>`}</div>
+    </div>
+    <div class="panel">
+      <div class="label">${t('Language')}</div>
+      <p class="muted">${t('Applies to every screen, the cards, the rulebook, and how the AI speaks and writes.')}</p>
+      <div class="actions">
+        <button class="${s.language === 'en' ? 'selected' : ''}" onclick="act('setLanguage',{language:'en'})">English</button>
+        <button class="${s.language === 'de' ? 'selected' : ''}" onclick="act('setLanguage',{language:'de'})">Deutsch</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div style="display:flex;align-items:center;gap:0.8em">
+        <div class="label" style="flex:none">${t('Debate length')}</div>
+        <select onchange="act('setDebateMinutes',{minutes:this.value})">
+          <option value="" ${s.debateMinutes ? '' : 'selected'}>${t('Automatic ({n} min)', { n: s.debateDefaultMinutes })}</option>
+          ${[1, 2, 3, 4, 5, 6, 8, 10, 15].map((n) => `<option value="${n}" ${s.debateMinutes === n ? 'selected' : ''}>${t('{n} min', { n })}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="label">${t('Setup')}</div>
+      <p class="mono" style="font-size:0.85em">${t('AI:')} ${esc(s.mod.aiMode)}<br>${t('Voice:')} ${s.mod.voiceEleven ? 'ElevenLabs' : t('browser voice')}${s.voiceInput ? '' : ` · ${t('typed questions only')}`}</p>
+      <div class="actions">
+        <button onclick="act('testVoice')">${t('Test the voice')}</button>
+        <button onclick="openRules()">${t('Rulebook')}</button>
+        <button onclick="act('toggleRules')">${s.showRules ? t('Hide rules on table screen') : t('Show rules on table screen')}</button>
+        ${s.showRules ? `<div class="rules-remote"><span class="muted">${t('Rulebook page on the table screen:')}</span>${[0, 1, 2, 3, 4].map((n) => `<button class="small ${s.rulesTab === n ? 'selected' : ''}" onclick="act('rulesTab',{tab:${n}})">${n + 1}</button>`).join('')}</div>` : ''}
+        <button class="danger" onclick="resetGame()">${t('Reset game')}</button>
+      </div>
+      <div class="label" style="margin-top:14px">${t('Print')}</div>
+      <div class="actions">
+        <a class="linkbtn" target="_blank" href="/cards?lang=${s.language}">${t('Voting cards')}</a>
+        <a class="linkbtn" target="_blank" href="/cheatsheet?lang=${s.language}">${t('Moderator cheat sheet')}</a>
+        <a class="linkbtn" target="_blank" href="/rules?lang=${s.language}">${t('Rulebook')}</a>
+        <a class="linkbtn" target="_blank" href="/paper.html?lang=${s.language}">${t('Paper edition (backup game)')}</a>
+      </div>
+      <p class="muted" style="margin-bottom:6px">${t('The moderator link stays the same across restarts.')}</p>
+      <div class="actions"><button onclick="newKey()">${t('New moderator key')}</button></div>
+    </div>`;
+  fit();
 }
 
 setInterval(() => {

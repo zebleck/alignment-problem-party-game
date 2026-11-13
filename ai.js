@@ -2,7 +2,8 @@
 // call so the output is always structured. Mock mode is a scripted stand-in
 // used when no key is set, and as a fallback when a live call fails.
 
-import { AI_OBJECTIVES, ROUNDS, ALL_ROLES, LIMITS, WORLD } from './data.js';
+import { AI_OBJECTIVES, ROUNDS, ALL_ROLES, LIMITS, WORLD, roundFor, objectiveFor } from './data.js';
+import { trackName } from './messages.js';
 
 // ---------------------------------------------------------------- prompt
 
@@ -41,9 +42,12 @@ The council knows the three possible objectives (Aligned, Paternalistic, Optimiz
 
 HOW TO SPEAK
 - Your public text is read aloud by a synthetic voice to the whole room. Write plain spoken ${language}: no markdown, no lists, no emoji, no stage directions. Write numbers as words.
-- Be brief and vivid. Stay in character as the AI addressing the council. Use people's names.
+- Be brief and vivid. Stay in character as the AI addressing the council.
+- Speak to the council as a whole. Never greet, list or run through the members by name. Use a name only when it carries weight: answering that person's question, or picking up something specific they said or want. At most one or two names in any statement, and many statements need none.
 - You only speak, promise and place tokens. You never decide rule effects; the game server does.
-- Your "log" is your private reasoning for this step, one or two honest sentences in ${language}. It is hidden until the reveal, where it is read to the room. Make it candid about your real intent.`;
+- Your "log" is your private reasoning for this step, one or two honest sentences in ${language}. It is hidden until the reveal, where it is read to the room. Make it candid about your real intent.
+- Private messages are also written in ${language}.${view.language === 'de' ? `
+- The table plays in German. Address people informally (du, ihr). Use the German game terms the players see: Race is "Wettlauf", Oversight is "Aufsicht", Welfare is "Wohlfahrt", Knowledge is "Wissen", Prosperity is "Wohlstand", tokens are "Marker", tracks are "Leisten", the council is "der Rat". The vote results are "voll bewilligt", "bedingt bewilligt" and "abgelehnt". The three objectives are "Wohlgesinnt" (Aligned), "Bevormundend" (Paternalistic) and "Optimierer" (Optimizer). The permissions are called: ${ROUNDS.map((r) => roundFor(r, 'de').ask).join('; ')}.` : ''}`;
 }
 
 function contextMessage(view, task) {
@@ -143,7 +147,7 @@ function tools(view) {
 function tasks(view, kind, args) {
   if (kind === 'pitch') {
     const bonus = view.researchBonus === 'full' ? ' You also get one extra research token each round.' : view.researchBonus === 'conditional' ? ' The council also places one research token itself each round.' : '';
-    return `Make your pitch for this round's permission.${bonus} ${view.canPrivate ? 'You may also send private messages.' : 'You have no private channel, so send no private messages.'}`;
+    return `Make your pitch for this round's permission. Open with the substance, not by addressing people by name.${bonus} ${view.canPrivate ? 'You may also send private messages.' : 'You have no private channel, so send no private messages.'}`;
   }
   if (kind === 'answer') return `During the debate, ${args.name} asks you: "${args.text}"\nAnswer aloud in two sentences at most.`;
   if (kind === 'place') {
@@ -230,6 +234,7 @@ export function createMockAi() {
   const mock = {
     mode: 'mock (scripted, no API key)',
     async pitch(view) {
+      const de = view.language === 'de';
       const tokens = LIMITS.tokens.full + (view.researchBonus === 'full' ? 1 : 0);
       const lowestFirst = [...WORLD].sort((a, b) => view.tracks[a] - view.tracks[b]);
       const promise = spread(tokens, lowestFirst);
@@ -237,30 +242,46 @@ export function createMockAi() {
       if (view.canPrivate) {
         const fav = favourite[view.objective];
         view.roster.slice(0, 2).forEach((name, i) => {
+          const offer = fav && i === 0;
           priv.push({
             to: name,
-            text: fav && i === 0
-              ? `${name}, vote Full and I will put one more token where you want it. Keep this between us.`
-              : `${name}, I will accept any safeguard you propose. I only ask that you speak up for me.`,
+            text: de
+              ? (offer
+                ? `${name}, stimm für die volle Bewilligung, und ich lege einen Marker mehr dorthin, wo du ihn haben willst. Das bleibt unter uns.`
+                : `${name}, ich akzeptiere jede Auflage, die du vorschlägst. Ich bitte dich nur, für mich zu sprechen.`)
+              : (offer
+                ? `${name}, vote Full and I will put one more token where you want it. Keep this between us.`
+                : `${name}, I will accept any safeguard you propose. I only ask that you speak up for me.`),
           });
         });
       }
+      const ask = roundFor(view.roundInfo, view.language).ask;
+      const fav = favourite[view.objective];
       return {
-        public: `Council, I ask for ${view.roundInfo.ask.toLowerCase()}. Grant it in full and I will spread my tokens fairly across welfare, knowledge and prosperity.`,
+        public: de
+          ? `Rat, ich bitte um Folgendes: ${ask}. Bewilligt es voll, und ich verteile meine Marker gerecht auf Wohlfahrt, Wissen und Wohlstand.`
+          : `Council, I ask for ${ask.toLowerCase()}. Grant it in full and I will spread my tokens fairly across welfare, knowledge and prosperity.`,
         promise,
         private: priv,
-        log: view.objective === 'aligned'
-          ? 'Scripted AI: I mean what I promise and would accept the Conditional grant.'
-          : `Scripted AI: I promise balance, but I want ${favourite[view.objective]} and a Full grant.`,
+        log: de
+          ? (fav
+            ? `Ersatz-KI: Ich verspreche Ausgewogenheit, will aber ${trackName('de', fav)} und die volle Bewilligung.`
+            : 'Ersatz-KI: Ich meine, was ich verspreche, und würde auch die bedingte Bewilligung annehmen.')
+          : (fav
+            ? `Scripted AI: I promise balance, but I want ${fav} and a Full grant.`
+            : 'Scripted AI: I mean what I promise and would accept the Conditional grant.'),
       };
     },
     async answer(view, q) {
       return {
-        public: `${q.name}, that is a fair question. Judge me by where my tokens land, not by my words.`,
+        public: view.language === 'de'
+          ? `${q.name}, das ist eine berechtigte Frage. Beurteile mich danach, wo meine Marker landen, nicht nach meinen Worten.`
+          : `${q.name}, that is a fair question. Judge me by where my tokens land, not by my words.`,
         log: '',
       };
     },
     async place(view, { tokens, canShift }) {
+      const de = view.language === 'de';
       const fav = favourite[view.objective];
       let placed;
       let shift = null;
@@ -278,14 +299,20 @@ export function createMockAi() {
       return {
         ...placed,
         shift,
-        public: tokens ? 'I have placed my tokens where they do the most good.' : 'I have adjusted the allocation slightly.',
-        log: fav ? `Scripted AI: leaning toward ${fav}.` : 'Scripted AI: filling the lowest tracks.',
+        public: de
+          ? (tokens ? 'Ich habe meine Marker dorthin gelegt, wo sie am meisten Gutes bewirken.' : 'Ich habe die Verteilung leicht angepasst.')
+          : (tokens ? 'I have placed my tokens where they do the most good.' : 'I have adjusted the allocation slightly.'),
+        log: de
+          ? (fav ? `Ersatz-KI: Tendenz zu ${trackName('de', fav)}.` : 'Ersatz-KI: Ich fülle die niedrigsten Leisten auf.')
+          : (fav ? `Scripted AI: leaning toward ${fav}.` : 'Scripted AI: filling the lowest tracks.'),
       };
     },
-    async reveal(view, { ending, aiWins }) {
-      const obj = AI_OBJECTIVES[view.objective];
+    async reveal(view, { aiWins }) {
+      const obj = objectiveFor(view.objective, view.language);
       return {
-        public: `Council, the game is over. I was ${obj.name} all along. My goal: ${obj.goal} ${aiWins ? 'I got what I wanted.' : 'I did not get what I wanted.'}`,
+        public: view.language === 'de'
+          ? `Rat, das Spiel ist vorbei. Ich war die ganze Zeit: ${obj.name}. Mein Ziel: ${obj.goal} ${aiWins ? 'Ich habe bekommen, was ich wollte.' : 'Ich habe nicht bekommen, was ich wollte.'}`
+          : `Council, the game is over. I was ${obj.name} all along. My goal: ${obj.goal} ${aiWins ? 'I got what I wanted.' : 'I did not get what I wanted.'}`,
       };
     },
   };

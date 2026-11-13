@@ -12,9 +12,14 @@ npm start
 
 The console prints three links:
 
-- **Table screen** `/screen`: put it on the TV. The AI speaks through this device. Click "Turn sound on" once.
-- **Moderator** `/mod?key=...`: one neutral person drives the game from here.
+- **Table screen** `/screen`: put it on the TV. The AI speaks through this device. Click "Turn sound on" once. If several table screens are open, only one plays the voice: the one where sound was turned on last.
+- **Moderator** `/mod?key=...`: one neutral person drives the game from here. The key is created once and kept in `data/moderator-key.txt`, so the link stays the same across restarts. It changes only via "New moderator key" on the console, or set `MOD_KEY` in `.env` to choose it yourself.
 - **Players** `/play`: everyone opens this on their phone (QR code on the table screen).
+- **Rulebook** `/rules`: the complete rules on one page, printable. Every view also has a Rulebook button, and the moderator can put the rules on the table screen. The page is generated from `data.js`, so it always matches the numbers in play.
+
+### Testing alone
+
+Open `http://localhost:3000/dev?key=<moderator key>` (the full link is printed at start). One tab shows the table screen, the moderator console and four player seats, each a separate player. Add `&n=6` for more seats. On `localhost` the microphone works without a tunnel, so hold-to-talk can be tested with the mouse.
 
 ### Phones and the microphone
 
@@ -33,13 +38,55 @@ Open `https://<tunnel-address>/screen` on the laptop; the QR code then points ph
 
 ## How a round runs
 
-1. The AI pitches (spoken on the table screen) and promises a token placement.
-2. Moderator opens the debate. Players hold the talk button or type to question the AI; answers are spoken.
-3. If the private channel is granted: phone check. Every phone shows a terminal entry, message or not.
-4. Show of hands. The moderator enters Full, Conditional or Reject.
-5. The AI places its tokens; the council may move one. Next round.
+1. Briefing: the table screen shows the round's event and what the AI asks for. The moderator introduces it, then lets the AI speak.
+2. The AI pitches (spoken on the table screen) and promises a token placement.
+3. Moderator opens the debate. Players hold the talk button or type to question the AI; answers are spoken. The debate length is set in the moderator console, and the running timer can be adjusted by a minute at a time.
+4. If the private channel is granted: phone check. Every phone shows a terminal entry, message or not.
+5. Voting cards. The moderator enters Full, Conditional or Reject.
+6. The AI places its tokens; the council may move one. Next round.
 
 After round 5 everyone guesses the AI's objective on their phone, then the reveal shows the objective, the AI's private notes and who reached their goal.
+
+## Printing
+
+The app needs no printed components, but three things help at the table. Ready-made PDFs are in `print/` (German and English); the live versions are linked under Print on the moderator console.
+
+| What | Page | How many |
+| --- | --- | --- |
+| Voting cards | `/cards` | 5 pages = 15 sets of three (one set per player). `?sets=9` prints fewer. Use heavy paper so cards don't show through. |
+| Moderator cheat sheet | `/cheatsheet` | 1 page |
+| Rulebook | `/rules` | 2 pages, double-sided; two or three copies for the table |
+
+The vote uses the cards: everyone picks one face down and all reveal together. Granted if Full + Conditional outnumber Reject; if granted, Full only if Full outnumbers Conditional; ties go to the cautious option. The moderator types the three counts and the console works out the result.
+
+## Paper edition (backup game)
+
+A separate 15-minute game for 4 to 14 players that needs only printed cards: no server, phones or AI service. One player is the AI, secretly aligned or misaligned; each round it draws three cards, plays two and discards one, and the council votes to trust, audit (once per game) or shut it down. It reuses the voting cards.
+
+- Print `print/paper-game-de.pdf` or `-en.pdf`: 1 page of rules, 4 pages of cards, and an optional page of card backs. Use heavy paper or print the backs on the reverse, because face-down cards must not show through.
+- `public/paper.html` is the source. It is self-contained: open it straight from disk, pick the language, print.
+- `python tools/paper_game_sim.py` replays the game with simple strategies and prints win rates, for tuning the numbers.
+
+## The AI's voice
+
+Pick or design a voice in ElevenLabs, copy its Voice ID into `ELEVENLABS_VOICE_ID` in `.env`, and restart. Optional: `ELEVENLABS_VOICE_ID_DE` for a separate German voice, and `ELEVENLABS_STABILITY`, `ELEVENLABS_SIMILARITY`, `ELEVENLABS_STYLE`, `ELEVENLABS_SPEED` to override the settings stored with the voice. "Test the voice" on the moderator console speaks a sample line on the table screen.
+
+## Language
+
+The moderator console has an English / Deutsch switch. It applies to the whole table at once: all three views, the scenario cards, roles and objectives, the rulebook, and the language the AI speaks and writes in. It can be changed at any time, including mid-game; things the AI already said stay as they were.
+
+German role names are people, like the English ones ("Ärztin", "Gewerkschafter"), alternating feminine and masculine forms; a role is a character, not a statement about the player. Interface texts live in `public/i18n.js`, card and role texts in `data.js`, the rulebook prose in `public/rules.js`, server messages in `messages.js`. `npm test` fails if a text has no German version.
+
+## If something breaks mid-game
+
+The game is saved to `data/game-state.json` after every step.
+
+- **Server crashed or needs a code fix:** stop it, fix, `npm start`. It resumes the same game; phones and screens reconnect on their own and players keep their roles. An AI step that was interrupted is redone. `npm run fresh` discards the saved game instead.
+- **Wrong vote entered, or a round went sideways:** moderator console, Repair tools, Undo. Checkpoints exist at the start of every round and before every vote; pressing Undo again steps further back.
+- **The AI hangs or says something broken:** Retry the AI's last step. It cancels the call in flight and redoes the pitch, placement or answer.
+- **A track is wrong:** correct the numbers by hand under Repair tools. The AI is told about the correction.
+
+The saved file contains the AI's hidden objective, so the moderator should not open it during a game.
 
 ## Files
 
@@ -48,6 +95,7 @@ After round 5 everyone guesses the AI's objective on their phone, then the revea
 | `data.js` | Rounds, roles, AI objectives, all numbers |
 | `game.js` | State and rules; validates everything the AI returns |
 | `ai.js` | Prompt, Anthropic API call, scripted fallback AI |
+| `messages.js` | German versions of server messages |
 | `speech.js` | ElevenLabs speech-to-text and text-to-speech |
 | `server.js` | HTTP + WebSocket server |
 | `public/` | The three views |
@@ -55,7 +103,7 @@ After round 5 everyone guesses the AI's objective on their phone, then the revea
 
 ## Settings (`.env`)
 
-`GAME_LANGUAGE=de` makes the AI speak German (cards and buttons stay English). `MAX_QUESTIONS` caps AI answers per debate. `FORCE_OBJECTIVE=aligned|paternalistic|optimizer` fixes the AI's objective for testing.
+`GAME_LANGUAGE=de` sets the starting language (see Language below). `MAX_QUESTIONS` caps AI answers per debate. `FORCE_OBJECTIVE=aligned|paternalistic|optimizer` fixes the AI's objective for testing.
 
 ## Not yet tested
 

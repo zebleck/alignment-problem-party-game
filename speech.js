@@ -3,16 +3,24 @@
 
 import crypto from 'node:crypto';
 
-export function createSpeech({ apiKey, voiceId = 'JBFqnCBsd6RMkjVDRZzb', ttsModel = 'eleven_flash_v2_5', sttModel = 'scribe_v2' } = {}) {
+// voiceIdDe: optional separate voice for German. settings: optional overrides for
+// the voice's stored settings (stability, similarity_boost, style, speed).
+export function createSpeech({ apiKey, voiceId = 'JBFqnCBsd6RMkjVDRZzb', voiceIdDe = null, ttsModel = 'eleven_flash_v2_5', sttModel = 'scribe_v2', settings = {} } = {}) {
   const clips = new Map(); // id -> Buffer (mp3)
   const enabled = !!apiKey;
+  const voiceSettings = Object.fromEntries(Object.entries(settings).filter(([, v]) => Number.isFinite(v)));
 
-  async function tts(text) {
+  async function tts(text, lang = 'en') {
     if (!enabled) return null;
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
+    const voice = lang === 'de' && voiceIdDe ? voiceIdDe : voiceId;
+    const body = { text, model_id: ttsModel };
+    if (Object.keys(voiceSettings).length) body.voice_settings = voiceSettings;
+    // The v2.5 models accept a language hint, which keeps German from being read with English rules.
+    if (ttsModel.includes('v2_5')) body.language_code = lang;
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`, {
       method: 'POST',
       headers: { 'xi-api-key': apiKey, 'content-type': 'application/json' },
-      body: JSON.stringify({ text, model_id: ttsModel }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) throw new Error(`ElevenLabs TTS ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);

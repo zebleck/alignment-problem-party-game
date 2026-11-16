@@ -74,7 +74,7 @@
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
-import { connect, esc, $, t, N, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
+import { connect, esc, $, t, N, icon, roleIcon, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 
 const rules = rulesOverlay();
@@ -240,12 +240,12 @@ function render() {
     <li>${t('Beating the AI is not a goal. It may reach its objective while you reach yours.')}</li>
   </ol>`;
   if (me.role) {
-    $('#roleName').textContent = me.role.name;
+    $('#roleName').innerHTML = `${roleIcon(me.role.key)}${esc(me.role.name)}`;
     $('#roleGoal').textContent = me.role.goal;
   }
   const tr = s.tracks;
   $('#miniTracks').innerHTML = [['race', `${tr.race}/${s.limits.raceLimit}`], ['oversight', tr.oversight], ['welfare', tr.welfare], ['knowledge', tr.knowledge], ['prosperity', tr.prosperity]]
-    .map(([k, v]) => `<div class="mt ${k}"><b>${v}</b><span>${trackName(k)}</span></div>`).join('');
+    .map(([k, v]) => `<div class="mt ${k}">${icon(k)}<b>${v}</b><span>${trackName(k)}</span></div>`).join('');
   // What is happening right now, and what this player should do about it.
   $('#hint').innerHTML = `<div class="phone-phase">${phaseName(s.phase)}</div><div class="phone-hint">${t(HINTS[s.phase] || '')}</div>${s.round && !['guess', 'ended'].includes(s.phase) ? headlineHtml(s) : ''}`;
 

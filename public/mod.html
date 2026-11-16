@@ -28,7 +28,7 @@
 </div>
 
 <script type="module">
-import { connect, esc, $, t, setLang, WORLD, trackName, phaseName, statusName, timerText, chip, placementHtml, playersJoined, voteEffect, headlineHtml } from '/common.js';
+import { connect, esc, $, t, setLang, WORLD, trackName, trackTag, phaseName, statusName, timerText, chip, placementHtml, playersJoined, voteEffect, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 import { autoFit } from '/fit.js';
 
@@ -227,8 +227,8 @@ function render() {
       <div class="label">${t('Moderator')} · ${online ? t('connected') : t('reconnecting…')}</div>
       <h2>${s.round ? `${t('Round {n} / {total}', { n: s.round, total: s.totalRounds })}: ${esc(s.roundInfo.title)}` : phaseName('lobby')} <span class="chip now">${phaseName(s.phase)}</span></h2>
       <div class="stats" style="margin-top:8px">
-        <span>${trackName('race')} ${tr.race}/${s.limits.raceLimit}</span><span>${trackName('oversight')} ${tr.oversight}</span>
-        <span>${trackName('welfare')} ${tr.welfare}</span><span>${trackName('knowledge')} ${tr.knowledge}</span><span>${trackName('prosperity')} ${tr.prosperity}</span>
+        <span>${trackTag('race')} ${tr.race}/${s.limits.raceLimit}</span><span>${trackTag('oversight')} ${tr.oversight}</span>
+        <span>${trackTag('welfare')} ${tr.welfare}</span><span>${trackTag('knowledge')} ${tr.knowledge}</span><span>${trackTag('prosperity')} ${tr.prosperity}</span>
       </div>
     </div>
     ${err ? `<div class="panel error">${esc(err)} <button onclick="act('clearError')">${t('Dismiss')}</button></div>` : ''}

@@ -242,7 +242,7 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
             limits: LIMITS,
             maxQuestions: game.config.maxQuestions,
             headlines: game.config.headlines === false ? [] : HEADLINES.map((h) => headlineFor(h.key, lang)),
-            rounds: ROUNDS.map((r) => roundFor(r, lang)).map(({ title, ask, full, conditional }) => ({ title, ask, full, conditional })),
+            rounds: ROUNDS.map((r) => roundFor(r, lang)).map(({ key, title, ask, full, conditional }) => ({ key, title, ask, full, conditional })),
             objectives: Object.keys(AI_OBJECTIVES).map((key) => objectiveFor(key, lang)),
             roles: ALL_ROLES.map((r) => roleFor(r.key, lang)),
           });

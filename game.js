@@ -943,7 +943,7 @@ export class Game {
       me: {
         id: player.id,
         name: player.name,
-        role: role ? { name: role.name, goal: role.goal } : null,
+        role: role ? { key: role.key, name: role.name, goal: role.goal } : null,
         inbox: player.inbox,
         guess: player.guess,
         queued: this.queue.some((q) => q.playerId === player.id),

@@ -64,7 +64,7 @@ The app needs no printed components, but three things help at the table. Ready-m
 | --- | --- | --- |
 | Voting cards | `/cards` | 5 sheets = 15 sets of three (one set per player), each sheet followed by its backs. Print double-sided, flip on the long edge, scale 100 %. `?sets=9` prints fewer. |
 | Moderator cheat sheet | `/cheatsheet` | 1 page |
-| Rulebook | `/rules` | 2 pages in English, 3 in German, double-sided; two or three copies for the table |
+| Rulebook | `/rules` | 4 pages in English, 5 in German, double-sided; two or three copies for the table |
 
 The vote uses the cards: everyone picks one face down and all reveal together. Granted if Full + Conditional outnumber Reject; if granted, Full only if Full outnumbers Conditional; ties go to the cautious option. The moderator types the three counts and the console works out the result.
 
@@ -110,6 +110,7 @@ The saved file and the game records contain the AI's hidden objective, so the mo
 | `speech.js` | ElevenLabs speech-to-text and text-to-speech |
 | `server.js` | HTTP + WebSocket server |
 | `public/` | The three views |
+| `public/icons.js` | One icon per track, vote result, round step, permission, ending and role; the colours are the `.c-*` classes in `style.css` |
 | `test/sim.js` | Plays full games against the scripted AI (`npm test`) |
 
 ## Settings (`.env`)

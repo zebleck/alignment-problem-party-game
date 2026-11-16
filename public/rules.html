@@ -35,6 +35,7 @@ import { loadRules, rulesHtml } from '/rules.js';
 async function show(lang) {
   const r = await loadRules(lang);
   setLang(r.language);
+  document.documentElement.lang = r.language; // so that long words are hyphenated by the right rules in print
   $('#title').textContent = `The Alignment Problem · ${t('Rulebook')}`;
   $('#print').textContent = t('Print');
   $('#en').classList.toggle('selected', r.language === 'en');

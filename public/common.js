@@ -2,7 +2,10 @@
 
 import { t, N } from '/i18n.js';
 
+import { icon } from '/icons.js';
+
 export { t, N, setLang, getLang } from '/i18n.js';
+export { icon, roleIcon, ICON } from '/icons.js';
 
 export const WORLD = ['welfare', 'knowledge', 'prosperity'];
 
@@ -21,6 +24,8 @@ const ENDINGS = {
 const STATUS = { full: N('Full'), conditional: N('Conditional'), rejected: N('Rejected') };
 
 export const trackName = (k) => t(TRACKS[k]);
+// A track's name with its icon, both in the track's colour.
+export const trackTag = (k) => `<span class="tag c-${k}">${icon(k)}${trackName(k)}</span>`;
 export const phaseName = (p) => t(PHASES[p]);
 export const endingText = (k) => ({ title: t(ENDINGS[k].title), text: t(ENDINGS[k].text) });
 export const statusName = (s) => t(STATUS[s]);
@@ -78,17 +83,17 @@ export function tracksHtml(state) {
   const paid = state.milestones || {};
   const bar = (k) => `
     <div class="track ${k}">
-      <div class="track-head"><span>${trackName(k)}</span><span class="track-value">${tr[k]}</span></div>
+      <div class="track-head">${trackTag(k)}<span class="track-value">${tr[k]}</span></div>
       <div class="bar" style="--scale:${scale}"><i style="width:${(tr[k] / scale) * 100}%"></i>${at ? `<u style="left:${(at / scale) * 100}%"></u>` : ''}</div>
       ${at ? `<div class="track-bonus ${paid[k] ? 'paid' : ''}">${paid[k] ? '✓ ' : ''}${t('at {n}:', { n: at })} ${bonus[k]}</div>` : ''}
     </div>`;
   return `
     <div class="track race">
-      <div class="track-head"><span>${trackName('race')}</span><span class="track-value">${tr.race} / ${state.limits.raceLimit}</span></div>
+      <div class="track-head">${trackTag('race')}<span class="track-value">${tr.race} / ${state.limits.raceLimit}</span></div>
       <div class="pips">${pips(tr.race, state.limits.raceLimit)}</div>
     </div>
     <div class="track oversight">
-      <div class="track-head"><span>${trackName('oversight')}</span><span class="track-value">${tr.oversight}</span></div>
+      <div class="track-head">${trackTag('oversight')}<span class="track-value">${tr.oversight}</span></div>
       <div class="pips">${pips(tr.oversight, Math.max(state.limits.oversightStart, tr.oversight))}</div>
     </div>
     ${WORLD.map(bar).join('')}`;
@@ -122,5 +127,5 @@ export function headlineHtml(state) {
   if (!h) return '';
   const result = state.headlineResult === 'met' ? ` <span class="yes">${t('Met: nothing is lost.')}</span>`
     : state.headlineResult === 'missed' ? ` <span class="no">${t('Missed: the track lost a token.')}</span>` : '';
-  return `<div class="headline"><span class="label">${t('Headline')}</span><b>${esc(h.title)}</b><span class="headline-text">${esc(h.text)}</span><span class="headline-effect">${esc(h.effect)}${result}</span></div>`;
+  return `<div class="headline"><span class="label">${icon('headline', 'full')}${t('Headline')}</span><b>${esc(h.title)}</b><span class="headline-text">${esc(h.text)}</span><span class="headline-effect">${esc(h.effect)}${result}</span></div>`;
 }

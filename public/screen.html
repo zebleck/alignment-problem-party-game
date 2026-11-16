@@ -50,7 +50,7 @@
 </div>
 
 <script type="module">
-import { connect, esc, $, t, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined, voteEffect, headlineHtml } from '/common.js';
+import { connect, esc, $, t, icon, roleIcon, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined, voteEffect, headlineHtml } from '/common.js';
 import { rulesOverlay, setRulesTab } from '/rules.js';
 import { autoFit } from '/fit.js';
 
@@ -324,7 +324,7 @@ function endHtml(s) {
       <div class="pcards">
         ${r.players.map((p) => `<div class="pcard">
           <div class="pcard-head"><b>${esc(p.name)}</b><span class="${p.success ? 'yes' : 'no'}">${p.success ? t('Succeeded') : t('Failed')}</span></div>
-          <div>${esc(p.role)}: <span class="muted">${esc(p.goal)}</span></div>
+          <div>${roleIcon(p.roleKey)}${esc(p.role)}: <span class="muted">${esc(p.goal)}</span></div>
           ${p.guess ? `<div class="muted">${t('Guessed')}: ${esc(s.objectives.find((o) => o.key === p.guess)?.name)}</div>` : ''}
         </div>`).join('')}
       </div>
@@ -341,7 +341,7 @@ function render() {
   $('#roundLabel').innerHTML = `${s.round ? `<span class="rounds">${s.rounds.map((_, i) => `<i class="${i + 1 < s.round ? 'done' : i + 1 === s.round ? 'now' : ''}"></i>`).join('')}</span><span class="round-text">${t('Round {n} / {total}', { n: s.round, total: s.totalRounds })}</span>` : ''}<b>${phaseName(s.phase)}</b>`;
   $('#tracks').innerHTML = `<div class="label" style="margin-bottom:10px">${t('Tracks')}</div>${tracksHtml(s)}`;
   $('#perms').innerHTML = `<div class="label">${t('Permissions')}</div>${s.rounds.map((r, i) => `
-    <div class="perm-row"><span>${i + 1}. ${esc(r.ask)}</span>${s.permissions[r.key] ? chip(s.permissions[r.key]) : i + 1 === s.round ? `<span class="chip now">${t('now')}</span>` : chip(null)}</div>`).join('')}`;
+    <div class="perm-row"><span>${icon(r.key, 'mod')}${i + 1}. ${esc(r.ask)}</span>${s.permissions[r.key] ? chip(s.permissions[r.key]) : i + 1 === s.round ? `<span class="chip now">${t('now')}</span>` : chip(null)}</div>`).join('')}`;
   $('#players').innerHTML = s.players.map((p) => `<span class="player ${p.connected ? '' : 'off'}">${esc(p.name)}</span>`).join('') || `<span class="muted">${t('Nobody yet')}</span>`;
   $('#main').innerHTML = mainHtml(s);
   if (s.phase === 'lobby' && window.qrcode) {

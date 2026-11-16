@@ -509,3 +509,154 @@ body.phone .toast { border-radius: 4px; }
 /* the five decisions: both outcome columns get the same room */
 .rules table.decisions { table-layout: fixed; }
 .rules table.decisions th:first-child { width: 30%; }
+
+/* ================================================================
+   Icons and characteristic colours.
+   Every thing the game talks about has one icon (icons.js) and one
+   colour: Race red, Oversight green, Welfare blue, Knowledge violet,
+   Prosperity light green, the AI amber, the council paper-white,
+   the moderator grey. A .c-* class sets the colour for an icon, a
+   name or a whole block.
+   ================================================================ */
+.c-race { --c: var(--bad); }
+.c-oversight { --c: var(--ok); }
+.c-welfare { --c: var(--welfare); }
+.c-knowledge { --c: var(--knowledge); }
+.c-prosperity { --c: var(--prosperity); }
+.c-full { --c: var(--warn); }
+.c-conditional { --c: var(--ok); }
+.c-rejected { --c: var(--bad); }
+.c-ai, .c-token { --c: var(--ai); }
+.c-all { --c: var(--text); }
+.c-mod, .c-optional { --c: var(--muted); }
+.c-race, .c-oversight, .c-welfare, .c-knowledge, .c-prosperity, .c-full, .c-conditional, .c-rejected, .c-ai, .c-token, .c-all, .c-mod, .c-optional { color: var(--c); }
+.ic { display: inline-flex; flex: none; width: 1.2em; height: 1.2em; vertical-align: -0.22em; --ic-knockout: var(--panel); }
+.ic svg, .rm-node svg, .flow-n svg, .person-ic svg, .perm-ic svg, .tab-ic svg { width: 100%; height: 100%; display: block; }
+.tag { display: inline-flex; align-items: center; gap: 0.35em; font-weight: 600; white-space: nowrap; }
+.tag + .tag { margin-left: 0.9em; }
+.role-ic { width: 1.9em; height: 1.9em; color: var(--ai); }
+.arrow { color: var(--muted); }
+
+/* tracks on the table screen and the phones carry their icon */
+.track-head .tag { font-weight: inherit; gap: 0.5em; }
+.track-head .ic { width: 1.35em; height: 1.35em; }
+/* (the selectors are this long to win over the small grey label style of .mini-tracks span) */
+.mini-tracks span.ic, body.phone .mini-tracks span.ic { display: flex; width: 1.4em; height: 1.4em; margin: 0 auto 4px; font-size: 1rem; color: var(--c); }
+.stats .tag { font-weight: inherit; }
+.perm-row .ic { margin-right: 0.45em; color: var(--muted); }
+.headline > .label .ic { margin-right: 0.4em; color: var(--warn); }
+.pcard .role-ic { width: 1.5em; height: 1.5em; margin-right: 0.3em; }
+body.phone #roleName .role-ic { width: 0.9em; height: 0.9em; margin-right: 0.25em; vertical-align: -0.08em; }
+
+/* ---------- rulebook pictures ---------- */
+.rules-tabs .tab-ic { width: 1.25em; height: 1.25em; opacity: 1; font-size: 1em; }
+.rules .flow-n { color: var(--c, var(--ai)); border-color: currentColor; }
+.rules .flow-n svg { width: 60%; height: 60%; }
+.rules .trk-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2em 0; }
+.rules .trk.welfare { border-color: var(--welfare); }
+
+/* the whole game in one line: too little, too much */
+.tension { display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 1em; align-items: center; margin: 1em 0; }
+.tension-end { display: grid; grid-template-columns: auto 1fr; column-gap: 0.7em; align-items: center; padding: 0.7em 0.9em; border: 1px solid currentColor; border-radius: 8px; background: color-mix(in srgb, currentColor 9%, transparent); }
+.tension-end .ic { grid-row: span 2; width: 2.2em; height: 2.2em; }
+.tension-end b { font-size: 1.05em; }
+.tension-end > span:last-child { grid-column: 2; color: var(--text); font-size: 0.88em; line-height: 1.3; }
+.tension-mid { text-align: center; color: var(--muted); font-size: 0.85em; }
+.tension-mid > span { display: inline-flex; align-items: center; gap: 0.45em; }
+.tension-bar { position: relative; height: 0.45em; margin: 0 0.4em 0.6em; border-radius: 99px; background: linear-gradient(90deg, var(--bad), var(--line) 38%, var(--line) 62%, var(--ai)); }
+.tension-bar::before, .tension-bar::after { content: ''; position: absolute; top: 50%; border: 0.5em solid transparent; transform: translateY(-50%); }
+.tension-bar::before { left: -0.7em; border-right-color: var(--bad); }
+.tension-bar::after { right: -0.7em; border-left-color: var(--ai); }
+
+/* who is at the table */
+.people { display: grid; gap: 0.75em; margin-bottom: 0.8em; }
+.person { display: grid; grid-template-columns: 2.5em 1fr; gap: 0.85em; align-items: start; }
+.person p { margin: 0; color: var(--text); }
+.person-ic { width: 2.5em; height: 2.5em; padding: 0.5em; border: 1px solid currentColor; border-radius: 50%; }
+
+/* milestones: track at 4, then what the council gets */
+.miles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7em; margin-top: 0.6em; }
+.mile { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3em 0.6em; padding: 0.6em 0.85em; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+.mile-at { display: inline-flex; align-items: center; gap: 0.3em; font-family: var(--mono); font-size: 1.3em; }
+
+/* a round at a glance: six stops on a line */
+.roundmap { list-style: none; margin: 0.5em 0 0; padding: 0; display: grid; grid-template-columns: repeat(6, 1fr); }
+.roundmap li { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.2em; padding: 0 0.3em; }
+.roundmap li::before { content: ''; position: absolute; top: 1.7em; left: -50%; width: 100%; height: 2px; background: var(--line); }
+.roundmap li::after { content: ''; position: absolute; top: 1.7em; left: 0; width: 0.55em; height: 0.55em; border-top: 2px solid var(--muted); border-right: 2px solid var(--muted); transform: translate(-70%, -45%) rotate(45deg); }
+.roundmap li:first-child::before, .roundmap li:first-child::after { display: none; }
+.rm-node { position: relative; z-index: 1; width: 3.4em; height: 3.4em; padding: 0.8em; border: 2px solid currentColor; border-radius: 50%; background: var(--panel); }
+.rm-node em { position: absolute; top: -0.45em; right: -0.45em; width: 1.7em; height: 1.7em; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; background: var(--panel); font: 600 0.68em var(--mono); }
+.roundmap b { margin-top: 0.35em; color: var(--text); overflow-wrap: anywhere; hyphens: auto; }
+.rm-who { font-family: var(--mono); font-size: 0.64em; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.roundmap .optional .rm-node { border-style: dashed; }
+.roundmap .c-ai .rm-node { box-shadow: 0 0 1.4em color-mix(in srgb, var(--ai) 30%, transparent); }
+.rm-legend { display: flex; flex-wrap: wrap; gap: 0.3em 1.5em; margin-top: 1em; padding-top: 0.7em; border-top: 1px solid var(--line); font-size: 0.8em; }
+.rm-legend span { display: inline-flex; align-items: center; gap: 0.5em; }
+.rm-legend i { width: 0.95em; height: 0.95em; border: 2px solid currentColor; border-radius: 50%; }
+.rm-legend .c-optional i { border-style: dashed; }
+
+/* the three vote results side by side */
+.outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6em; margin-bottom: 0.9em; }
+.outcome { padding: 0.6em 0.7em 0.4em; border: 1px solid var(--line); border-top: 3px solid var(--muted); border-radius: 6px; background: var(--panel-2); }
+.outcome.full { border-top-color: var(--warn); }
+.outcome.conditional { border-top-color: var(--ok); }
+.outcome.rejected { border-top-color: var(--bad); }
+.outcome-head { display: flex; align-items: center; gap: 0.45em; margin-bottom: 0.45em; font-size: 1.1em; --ic-knockout: var(--panel-2); }
+.outcome-head .ic { width: 1.5em; height: 1.5em; }
+.outcome-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.2em 0.4em; padding: 0.3em 0; border-top: 1px solid var(--line); font-size: 0.88em; }
+.outcome-row > b { font-family: var(--mono); color: var(--text); }
+.toks { display: inline-flex; gap: 0.22em; }
+.toks i { width: 0.8em; height: 0.8em; border-radius: 50%; background: var(--ai); }
+.toks.none { color: var(--muted); }
+
+/* tokens: placed by the AI, then one may be moved */
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5em; margin-bottom: 0.9em; }
+.pill { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.4em; padding: 0.4em 0.75em; border: 1px solid var(--line); border-radius: 99px; background: var(--panel-2); font-size: 0.9em; }
+.pill.c-ai { border-color: var(--ai); }
+.pill .tag + .tag { margin-left: 0.5em; }
+
+/* the five permissions, the headlines, the objectives, the roles */
+.perm { display: flex; align-items: center; gap: 0.75em; }
+.perm-ic { position: relative; flex: none; width: 2.4em; height: 2.4em; padding: 0.5em; border: 1px solid var(--ai); border-radius: 8px; color: var(--ai); }
+.perm-ic em { position: absolute; top: -0.5em; left: -0.5em; width: 1.6em; height: 1.6em; display: grid; place-items: center; border-radius: 50%; background: var(--ai); color: #1a1405; font: 600 0.68em var(--mono); }
+.rules th .ic { margin-right: 0.4em; }
+.hl-list { margin: 0.5em 0 0.7em; }
+.hl { display: grid; grid-template-columns: 1.3em minmax(5.5em, 0.75fr) 2fr; gap: 0.6em; align-items: start; padding: 0.42em 0; border-bottom: 1px solid var(--line); }
+.hl:last-child { border-bottom: 0; }
+.objs { display: grid; gap: 0.6em; margin: 0.6em 0; }
+.obj { padding: 0.55em 0.85em 0.6em; border-left: 4px solid currentColor; border-radius: 0 8px 8px 0; background: var(--panel-2); }
+.obj-head { display: flex; align-items: center; gap: 0.5em; font-size: 1.1em; }
+.obj p { margin: 0.25em 0 0; color: var(--text); }
+.obj p.muted { color: var(--muted); font-size: 0.9em; }
+.role-list { margin: 0.5em 0 0.7em; }
+.role { display: grid; grid-template-columns: 1.9em 1fr auto; gap: 0.75em; align-items: center; padding: 0.4em 0; border-bottom: 1px solid var(--line); }
+.role:last-child { border-bottom: 0; }
+.role div span { font-size: 0.92em; }
+.role-cares { display: inline-flex; gap: 0.25em; }
+
+@media (max-width: 760px) {
+  .tension, .miles { grid-template-columns: 1fr; }
+  .roundmap { font-size: 0.72em; }
+  .roundmap b { font-size: 1.15em; }
+  .outcomes { gap: 0.35em; }
+  .hl { grid-template-columns: 1.3em 1fr; }
+  .hl > span:last-child { grid-column: 2; }
+}
+@media print {
+  /* Paper: the same colours, darkened so they hold on white. */
+  body:not(.paper) { --bg: #fff; --panel: #fff; --panel-2: #f4f4f1; --line: #c9c9c4; --text: #000; --muted: #5a5a55; --ai: #a86a00; --ok: #17805c; --warn: #c2541a; --bad: #c22d42; --welfare: #1479a3; --knowledge: #6a45c4; --prosperity: #38862f; }
+  .tension, .miles { grid-template-columns: 1fr; gap: 1.5mm; }
+  .tension-bar { display: none; }
+  .roundmap { font-size: 0.7em; }
+  .roundmap b { font-size: 1.05em; overflow-wrap: normal; hyphens: manual; }
+  .roundmap li { padding: 0; }
+  .roundmap .c-ai .rm-node { box-shadow: none; }
+  /* narrow columns: a permission's icon sits above its name, so long words keep their room */
+  .perm { flex-direction: column; align-items: flex-start; gap: 0.3em; }
+  .perm-ic { width: 1.9em; height: 1.9em; padding: 0.38em; margin: 0.4em 0 0 0.4em; }
+  .perm > div { overflow-wrap: anywhere; hyphens: auto; }
+  .rules table.decisions th:first-child { width: 40%; }
+  .rules table.decisions td { overflow-wrap: anywhere; hyphens: auto; }
+  .perm-ic em { color: #fff; }
+}

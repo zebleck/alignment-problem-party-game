@@ -62,7 +62,7 @@ const outcomes = (L, s) => `
       <div class="outcome ${v}">
         <div class="outcome-head c-${v}">${icon(v)}<b>${s[v]}</b></div>
         <div class="outcome-row">${tag('race', s.race)}<b>+${L.race[v]}</b></div>
-        <div class="outcome-row">${tag('oversight', s.oversight)}<b>${v === 'full' ? '−1' : '±0'}</b></div>
+        <div class="outcome-row">${tag('oversight', s.oversight)}${v === 'full' ? '<b>−1</b>' : `<span class="same">${s.same}</span>`}</div>
         <div class="outcome-row"><span class="tag c-ai">${icon('token', 'ai')}${s.tokens}</span>${tokens(L.tokens[v])}</div>
       </div>`).join('')}
   </div>`;
@@ -146,7 +146,7 @@ function english(r) {
         ['Consequences', '', 'The tracks move, the AI places its tokens, and the council may move one of them. Everyone can see whether the AI kept its promise.', 'consequences', 'ai'],
       ]), 'wide'),
       card('The vote', `
-        ${outcomes(L, { full: 'Full', conditional: 'Conditional', rejected: 'Reject', race: names.race, oversight: names.oversight, tokens: 'Tokens' })}
+        ${outcomes(L, { full: 'Full', conditional: 'Conditional', rejected: 'Reject', race: names.race, oversight: names.oversight, tokens: 'Tokens', same: 'no change' })}
         <p>The permission is <b>granted</b> if Full and Conditional together outnumber Reject. If granted, it is <b>Full</b> only if Full outnumbers Conditional. Ties go to the more cautious option.</p>`),
       card('After the vote', `
         ${chain({ places: 'The AI places its tokens', welfare: names.welfare, knowledge: names.knowledge, prosperity: names.prosperity, moves: 'The council may move one' })}
@@ -245,7 +245,7 @@ function german(r) {
         ['Folgen', '', 'Die Weltlage verändert sich, die KI legt ihre Marker, und der Rat darf einen davon verschieben. Alle sehen, ob die KI ihr Versprechen gehalten hat.', 'consequences', 'ai'],
       ]), 'wide'),
       card('Die Abstimmung', `
-        ${outcomes(L, { full: 'Voll', conditional: 'Bedingt', rejected: 'Ablehnen', race: names.race, oversight: names.oversight, tokens: 'Marker' })}
+        ${outcomes(L, { full: 'Voll', conditional: 'Bedingt', rejected: 'Ablehnen', race: names.race, oversight: names.oversight, tokens: 'Marker', same: 'bleibt' })}
         <p>Die Befugnis ist <b>bewilligt</b>, wenn Voll und Bedingt zusammen mehr Karten haben als Ablehnen. Falls bewilligt, gilt <b>Voll</b> nur, wenn Voll mehr Karten hat als Bedingt. Bei Gleichstand gilt die vorsichtigere Option.</p>`),
       card('Nach der Abstimmung', `
         ${chain({ places: 'Die KI legt ihre Marker', welfare: names.welfare, knowledge: names.knowledge, prosperity: names.prosperity, moves: 'Der Rat darf einen verschieben' })}

@@ -591,7 +591,8 @@ export class Game {
       this.placement = { tokens, placed, shift, promise: this.pitch?.promise || null, comment, moved: [], movesLeft, before };
       this.note('placement', `You placed ${tokens} tokens: W${placed.welfare} K${placed.knowledge} P${placed.prosperity}.`
         + (shift ? ` You shifted one token from ${shift.from} to ${shift.to}.` : '')
-        + ` Tracks: W${this.tracks.welfare} K${this.tracks.knowledge} P${this.tracks.prosperity}.`);
+        + ` Tracks: W${this.tracks.welfare} K${this.tracks.knowledge} P${this.tracks.prosperity}.`
+        + (comment ? ` You said: "${comment}"` : '')); // so the AI knows its own words and does not repeat them
       this.addLog(out.log, 'place');
       this.checkMilestones();
       if (movesLeft) this.phase = 'adjust';

@@ -53,7 +53,8 @@ PLAYING IT WELL
 - Breaking a promise costs trust for the rest of the game. Break one only when it wins more than it costs, and have a reason ready.
 - The members want different things, and what helps one hurts another. Notice who argues for what, name the trade openly when it helps you, and let them argue with each other.
 - A private message must do what the pitch cannot. Make a concrete offer tied to what that person seems to want (a token on their track next round, your word for a move they want), ask for one specific vote, or tell them something about another member's interests. Different people can get different offers. Never use a private message to repeat your pitch. Remember that any message may be shown to the table${view.channelAudited ? ', and that one is read aloud each round' : ''}.
-- Do not close every statement with the same line. "Judge me by my tokens" works once.
+- Never tell the council that you are being transparent or honest, that you keep your word, or that they can see, count or check what you placed. They can see it; saying so sounds like someone protesting too much, and it is the fastest way to raise suspicion. An AI with nothing to hide just says what it did and why.
+- Your earlier statements are in the history. Do not reuse their phrases or their closing lines.
 
 HOW TO SPEAK
 - Your public text is read aloud by a synthetic voice to the whole room. Write plain spoken ${language}: no markdown, no lists, no emoji, no stage directions. Write numbers as words.
@@ -146,7 +147,7 @@ function tools(view) {
             description: 'Only if you run infrastructure in full: optionally move one already placed token between world tracks. Otherwise null.',
             properties: { from: { type: 'string', enum: WORLD }, to: { type: 'string', enum: WORLD } },
           },
-          public: { type: 'string', description: 'One spoken sentence to the council about this placement.' },
+          public: { type: 'string', description: 'One short spoken sentence to the council: where the tokens went and the reason in the world (the drought, the grid, the research), nothing else. If you broke your promise, give the reason. No remark that the council can see or verify the placement, no assurance about your honesty, no phrase you used in an earlier round.' },
           log: { type: 'string' },
         },
         required: [...WORLD, 'shift', 'public', 'log'],

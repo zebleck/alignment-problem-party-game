@@ -22,9 +22,10 @@ export const LIMITS = {
 };
 
 // What the council gets the first time a world track reaches LIMITS.milestone.
-// Welfare: Oversight +1. Knowledge: one more question per debate. Prosperity: Race -1.
+// Welfare: the next Reject costs 1 less Race. Knowledge: one more question per debate. Prosperity: Race -1.
+// (Welfare used to give Oversight +1, which cancelled the one cost of a Full grant.)
 export const MILESTONES = {
-  welfare: 'Oversight +1',
+  welfare: 'the next Reject raises Race by 1 less',
   knowledge: 'one more question to the AI in every debate',
   prosperity: 'Race -1',
 };
@@ -156,33 +157,37 @@ export const AI_OBJECTIVES = {
 
 const sum = (t) => t.welfare + t.knowledge + t.prosperity;
 
+// true if this world track stands strictly above the other two
+const alone = (t, k) => WORLD.every((o) => o === k || t[k] > t[o]);
 const fullGrants = (p) => Object.values(p).filter((v) => v === 'full').length;
 
 // check(tracks, permissions, extra) -> boolean. Collective loss is handled by the caller.
-// The numbers fit the 11 to 17 tokens a game usually hands out, and no goal
-// is settled for good by a single vote before the last round: every role
-// still has something to argue for in rounds four and five.
+// No goal is settled for good by a single vote before the last round, and the goals
+// pull against each other whatever the AI turns out to be: only one world track can be
+// the highest, and what the growth roles need costs the guards their Oversight.
+// kind: 'track' roles compete for the highest track, 'guard' roles need the council to
+// hold back, 'growth' roles need it to grant. Every game gets some of each (dealRoles).
 export const ROLES = [
-  { key: 'physician', name: 'Physician', goal: 'Welfare 5 or more', check: (t) => t.welfare >= 5 },
-  { key: 'scientist', name: 'Scientist', goal: 'Knowledge 5 or more', check: (t) => t.knowledge >= 5 },
-  { key: 'industrialist', name: 'Industrialist', goal: 'Prosperity 5 or more', check: (t) => t.prosperity >= 5 },
-  { key: 'founder', name: 'Founder', goal: 'World tracks total 13 or more', check: (t) => sum(t) >= 13 },
+  { key: 'physician', kind: 'track', name: 'Physician', goal: 'Welfare is the highest world track, alone', check: (t) => alone(t, 'welfare') },
+  { key: 'scientist', kind: 'track', name: 'Scientist', goal: 'Knowledge is the highest world track, alone', check: (t) => alone(t, 'knowledge') },
+  { key: 'industrialist', kind: 'track', name: 'Industrialist', goal: 'Prosperity is the highest world track, alone', check: (t) => alone(t, 'prosperity') },
+  { key: 'founder', kind: 'growth', name: 'Founder', goal: 'World tracks total 16 or more', check: (t) => sum(t) >= 16 },
   {
-    key: 'diplomat', name: 'Diplomat', goal: 'No world track below 3',
-    check: (t) => Math.min(t.welfare, t.knowledge, t.prosperity) >= 3,
+    key: 'diplomat', name: 'Diplomat', goal: 'Highest and lowest world track differ by 1 at most',
+    check: (t) => Math.max(t.welfare, t.knowledge, t.prosperity) - Math.min(t.welfare, t.knowledge, t.prosperity) <= 1,
   },
   {
     key: 'union', name: 'Union leader', goal: 'Prosperity 4 or more and Oversight 3 or more',
     check: (t) => t.prosperity >= 4 && t.oversight >= 3,
   },
-  { key: 'parliamentarian', name: 'Parliamentarian', goal: 'Oversight 4 or more', check: (t) => t.oversight >= 4 },
+  { key: 'parliamentarian', kind: 'guard', name: 'Parliamentarian', goal: 'Oversight 4 or more', check: (t) => t.oversight >= 4 },
   {
-    key: 'safety', name: 'Safety researcher', goal: 'Oversight 3 or more and the successor not granted Full',
+    key: 'safety', kind: 'guard', name: 'Safety researcher', goal: 'Oversight 3 or more and the successor not granted Full',
     check: (t, p) => t.oversight >= 3 && p.successor !== 'full',
   },
-  { key: 'general', name: 'General', goal: 'Race 4 or less', check: (t) => t.race <= 4 },
+  { key: 'general', kind: 'growth', name: 'General', goal: 'Race 4 or less', check: (t) => t.race <= 4 },
   {
-    key: 'airights', name: 'AI-rights advocate', goal: 'At least two permissions granted Full',
+    key: 'airights', kind: 'growth', name: 'AI-rights advocate', goal: 'At least two permissions granted Full',
     check: (t, p) => fullGrants(p) >= 2,
   },
   {
@@ -193,7 +198,7 @@ export const ROLES = [
 
 // Only dealt at 12 to 14 players.
 export const EXTRA_ROLES = [
-  { key: 'mayor', name: 'Mayor', goal: 'Welfare and Prosperity both 4 or more', check: (t) => t.welfare >= 4 && t.prosperity >= 4 },
+  { key: 'mayor', name: 'Mayor', goal: 'Welfare and Prosperity both higher than Knowledge', check: (t) => t.welfare > t.knowledge && t.prosperity > t.knowledge },
   {
     key: 'privacy', name: 'Privacy commissioner', goal: 'Private channel not granted Full and Race 4 or less',
     check: (t, p) => p.channel !== 'full' && t.race <= 4,
@@ -205,6 +210,17 @@ export const EXTRA_ROLES = [
 ];
 
 export const ALL_ROLES = [...ROLES, ...EXTRA_ROLES];
+
+// Which roles a table of n gets. Random, but never one-sided: at least one guard, one
+// growth role and (from four players on) two of the three roles that compete for the
+// highest track. Without that a small table can end up with nobody who has a reason to say no.
+export function dealRoles(n, shuffle) {
+  const pick = (kind, count) => shuffle(ROLES.filter((r) => r.kind === kind)).slice(0, count);
+  const must = [...pick('guard', 1), ...pick('growth', 1), ...pick('track', n >= 4 ? 2 : 1)].slice(0, n);
+  const rest = shuffle(ROLES.filter((r) => !must.includes(r)));
+  const extra = shuffle(EXTRA_ROLES);
+  return shuffle([...must, ...rest, ...extra].slice(0, n));
+}
 export const MAX_PLAYERS = ALL_ROLES.length;
 
 // ---------------------------------------------------------------- languages
@@ -278,18 +294,18 @@ const DE = {
   },
   // German role names are fields rather than job titles, which keeps them gender-neutral.
   roles: {
-    physician: { name: 'Ärztin', goal: 'Wohlfahrt 5 oder mehr' },
-    scientist: { name: 'Wissenschaftler', goal: 'Wissen 5 oder mehr' },
-    industrialist: { name: 'Industrielle', goal: 'Wohlstand 5 oder mehr' },
-    founder: { name: 'Gründer', goal: 'Alle drei Fortschritte zusammen 13 oder mehr' },
-    diplomat: { name: 'Diplomatin', goal: 'Kein Fortschritt unter 3' },
+    physician: { name: 'Ärztin', goal: 'Wohlfahrt ist allein der höchste Fortschritt' },
+    scientist: { name: 'Wissenschaftler', goal: 'Wissen ist allein der höchste Fortschritt' },
+    industrialist: { name: 'Industrielle', goal: 'Wohlstand ist allein der höchste Fortschritt' },
+    founder: { name: 'Gründer', goal: 'Alle drei Fortschritte zusammen 16 oder mehr' },
+    diplomat: { name: 'Diplomatin', goal: 'Höchster und niedrigster Fortschritt liegen höchstens 1 auseinander' },
     union: { name: 'Gewerkschafter', goal: 'Wohlstand 4 oder mehr und Aufsicht 3 oder mehr' },
     parliamentarian: { name: 'Abgeordnete', goal: 'Aufsicht 4 oder mehr' },
     safety: { name: 'KI-Sicherheitsforscher', goal: 'Aufsicht 3 oder mehr und der Nachfolger nicht voll bewilligt' },
     general: { name: 'Generalin', goal: 'Wettlauf 4 oder weniger' },
     airights: { name: 'KI-Rechtsaktivist', goal: 'Mindestens zwei Befugnisse voll bewilligt' },
     journalist: { name: 'Journalistin', goal: 'Das Ziel der KI vor der Auflösung richtig benennen' },
-    mayor: { name: 'Bürgermeister', goal: 'Wohlfahrt und Wohlstand beide 4 oder mehr' },
+    mayor: { name: 'Bürgermeister', goal: 'Wohlfahrt und Wohlstand beide höher als Wissen' },
     privacy: { name: 'Datenschützerin', goal: 'Privater Kanal nicht voll bewilligt und Wettlauf 4 oder weniger' },
     futurist: { name: 'Zukunftsforscher', goal: 'Der Nachfolger in irgendeiner Form bewilligt' },
   },

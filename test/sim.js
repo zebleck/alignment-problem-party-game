@@ -73,13 +73,13 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
 }
 
 {
-  // All Conditional: 16 tokens, control retained. Race would be 5 and Oversight 5, but two
-  // milestones are reached on the way: Welfare 4 (Oversight +1) and, with the council's own
-  // research tokens, Prosperity 4 (Race -1). Knowledge stays at 3 and pays nothing.
+  // All Conditional: 16 tokens. Race would be 5, but with the council's own research tokens
+  // Prosperity reaches 4 (Race -1). Welfare reaches 4 too; its reward (a cheaper Reject) is never
+  // used here. Knowledge stays at 3 and pays nothing. Oversight stays at 5: nothing gives it back.
   const g = await playDirect({ objective: 'paternalistic', votes: Array(5).fill('conditional') });
   const t = g.result.tracks;
   assert.equal(t.race, 4);
-  assert.equal(t.oversight, 6);
+  assert.equal(t.oversight, 5);
   assert.deepEqual(g.milestones, { welfare: true, prosperity: true });
   assert.equal(g.maxQuestions(), 3, 'no extra question without the Knowledge milestone');
   // 5 x 2 tokens + 2 successor bonus + 4 council research tokens
@@ -115,8 +115,8 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
   const g = await playDirect({ objective: 'aligned', votes: ['full', 'conditional', 'conditional', 'conditional', 'full'] });
   assert.equal(g.result.ending, 'flourishing');
   assert.equal(g.result.aiWins, true);
-  // Two Full grants take Oversight from 5 to 3; the Welfare milestone gives one back.
-  assert.equal(g.result.tracks.oversight, 4);
+  // Two Full grants take Oversight from 5 to 3, and no milestone gives it back.
+  assert.equal(g.result.tracks.oversight, 3);
   assert.equal(g.maxQuestions(), 4, 'the Knowledge milestone adds a question to every debate');
   console.log('ok  aligned + Full  ->', g.result.ending, g.result.tracks);
 }
@@ -667,22 +667,49 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   console.log('ok  a game saved by the previous version loads and plays on');
 }
 {
-  // Role goals: none is settled for good by a single early vote.
-  const { ROLES, EXTRA_ROLES } = await import('../data.js');
+  // Role goals pull against each other: only one world track can be the highest.
+  const { ROLES, EXTRA_ROLES, dealRoles } = await import('../data.js');
   const role = (key) => [...ROLES, ...EXTRA_ROLES].find((x) => x.key === key).check;
-  const t = { race: 4, oversight: 3, welfare: 7, knowledge: 3, prosperity: 3 };
   const p = { research: 'full', infrastructure: 'conditional', channel: 'conditional', autonomy: 'full', successor: 'rejected' };
-  assert.equal(role('physician')(t, p), true);
-  assert.equal(role('industrialist')(t, p), false);
-  assert.equal(role('founder')(t, p), true, '13 tokens in total are enough');
-  assert.equal(role('diplomat')(t, p), true, 'no track below 3');
+  const t = { race: 4, oversight: 3, welfare: 7, knowledge: 6, prosperity: 3 };
+  assert.deepEqual(['physician', 'scientist', 'industrialist'].map((k) => role(k)(t, p)), [true, false, false], 'Welfare alone is highest');
+  const tie = { ...t, knowledge: 7 };
+  assert.deepEqual(['physician', 'scientist', 'industrialist'].map((k) => role(k)(tie, p)), [false, false, false], 'a tie at the top helps nobody');
+  const even = { ...t, welfare: 6, knowledge: 6, prosperity: 5 };
+  assert.equal(role('diplomat')(even, p), true, 'tracks within 1 of each other');
+  assert.equal(role('diplomat')(t, p), false);
+  assert.equal(role('founder')(t, p), true, '16 tokens in total');
+  assert.equal(role('founder')({ ...t, welfare: 6 }, p), false);
+  assert.equal(role('mayor')({ ...t, prosperity: 7 }, p), true);
   assert.equal(role('general')(t, p), true, 'Race 4 still counts');
   assert.equal(role('airights')(t, p), true, 'any two Full grants');
   assert.equal(role('airights')(t, { ...p, autonomy: 'conditional' }), false);
-  assert.equal(role('union')(t, p), false);
-  assert.equal(role('union')({ ...t, prosperity: 4 }, p), true, 'no longer lost by one vote on autonomy');
+  assert.equal(role('union')({ ...t, prosperity: 4 }, p), true);
   assert.equal(role('privacy')(t, p), true);
-  console.log('ok  reworked role goals');
+  // Every table gets a mix: someone who needs the council to hold back, someone who needs it to grant,
+  // and people who compete for the highest track.
+  const mix = (list) => [...list].sort(() => Math.random() - 0.5);
+  for (let n = 3; n <= 14; n++) {
+    for (let i = 0; i < 40; i++) {
+      const dealt = dealRoles(n, mix);
+      assert.equal(new Set(dealt.map((r) => r.key)).size, n, 'no role twice');
+      const count = (kind) => dealt.filter((r) => r.kind === kind).length;
+      assert.ok(count('guard') >= 1 && count('growth') >= 1 && count('track') >= (n >= 4 ? 2 : 1), `a mix at ${n} players`);
+      if (n <= 11) assert.ok(dealt.every((r) => ROLES.includes(r)), 'the extra roles only come in from 12 players');
+    }
+  }
+  // The Welfare milestone: the next Reject costs one less Race, once.
+  const g = mk();
+  await g.start();
+  g.tracks.welfare = 4;
+  g.checkMilestones();
+  assert.equal(g.tracks.oversight, 5, 'Welfare no longer gives Oversight back');
+  assert.deepEqual(['full', 'conditional', 'rejected'].map((v) => g.raceCost(v)), [0, 1, 1]);
+  await toVote(g);
+  await g.vote('rejected');
+  assert.equal(g.tracks.race, 1);
+  assert.equal(g.raceCost('rejected'), 2, 'only once');
+  console.log('ok  competing role goals, a mix of roles at every table size, Welfare milestone');
 }
 
 {

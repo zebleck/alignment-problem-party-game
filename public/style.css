@@ -724,3 +724,10 @@ body.table .screen .row > .ai-box { flex: 1 1 22em; min-width: 0; }
 .vote-clock { float: right; font-size: 1.5em; letter-spacing: 0; color: var(--ai); }
 .vote-clock.over { color: var(--bad); }
 #voteBtns .primary, #moveBody .primary { width: 100%; margin-top: 4px; }
+
+/* which kinds of AI are a threat to the council, and which is not */
+.obj-mark { display: inline-flex; align-items: center; gap: 0.4em; margin: 0.35em 0 0.1em; padding: 0.2em 0.6em 0.2em 0.45em; border: 1px solid currentColor; border-radius: 99px; font-size: 0.82em; font-weight: 600; }
+.obj-mark.safe { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.obj-mark.danger { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.obj.danger { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 45%, transparent); }
+.obj.safe { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 45%, transparent); }

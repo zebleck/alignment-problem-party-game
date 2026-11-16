@@ -43,7 +43,7 @@ const people = (rows) => `<div class="people">${rows.map(([ic, colour, text]) =>
 // What the council gets the first time a world track reaches the milestone.
 const milestones = (L, s) => `
   <div class="miles">
-    ${[['welfare', tag('oversight', `${s.oversight} +1`)], ['knowledge', tag('debate', s.question, 'all')], ['prosperity', tag('race', `${s.race} −1`)]]
+    ${[['welfare', tag('rejected', s.reject)], ['knowledge', tag('debate', s.question, 'all')], ['prosperity', tag('race', `${s.race} −1`)]]
     .map(([k, reward]) => `<div class="mile"><span class="mile-at c-${k}">${icon(k)}<b>${L.milestone}</b></span><span class="arrow">→</span>${reward}</div>`).join('')}
   </div>`;
 
@@ -88,9 +88,13 @@ const HEADLINE_ICON = { spy: ['race'], setback: ['race'], demo: ['race'], protes
 const headlines = (r) => `<div class="hl-list">${(r.headlines || []).map((h) => `<div class="hl">${icon(...(HEADLINE_ICON[h.key] || ['headline', 'all']))}<b>${esc(h.title)}</b><span>${esc(h.effect)}</span></div>`).join('')}</div>`;
 
 const OBJECTIVE_ICON = { aligned: ['flourishing', 'oversight'], paternalistic: ['welfare', 'welfare'], optimizer: ['knowledge', 'knowledge'] };
-const objectives = (r) => `<div class="objs">${r.objectives.map((o) => {
+// Each kind of AI with its drawing, and a plain mark for what it means to the council:
+// the aligned one is no threat, the other two make every human lose if they get their way.
+const objectives = (r, s) => `<div class="objs">${r.objectives.map((o) => {
+  const safe = o.key === 'aligned';
+  const mark = `<div class="obj-mark ${safe ? 'safe' : 'danger'}">${icon(safe ? 'oversight' : 'danger', safe ? 'oversight' : 'race')}${safe ? s.safe : s.danger}</div>`;
   const [ic, colour] = OBJECTIVE_ICON[o.key] || ['ai', 'ai'];
-  return `<div class="obj c-${colour}">${aiFigure(o.key)}<div><div class="obj-head">${icon(ic, colour)}<b>${esc(o.name)}</b></div><p>${esc(o.goal)}</p><p class="muted">${esc(o.rule)}</p></div></div>`;
+  return `<div class="obj c-${colour} ${safe ? 'safe' : 'danger'}">${aiFigure(o.key)}<div><div class="obj-head">${icon(ic, colour)}<b>${esc(o.name)}</b></div>${mark}<p>${esc(o.goal)}</p><p class="muted">${esc(o.rule)}</p></div></div>`;
 }).join('')}</div>`;
 
 // What each role's objective is about, as small icons next to it.
@@ -125,7 +129,7 @@ function english(r) {
           <p>The three world tracks: what the AI's work does for the world. Each granted permission gives the AI <b>tokens</b>, and it decides which world track each token goes on. Most secret objectives are about how high these three end up.</p></div>`),
       card('Milestones', `
         <p>The first time a world track reaches ${L.milestone}, the council is paid once.</p>
-        ${milestones(L, { oversight: names.oversight, race: names.race, question: '+1 question per debate' })}`, 'wide'),
+        ${milestones(L, { reject: 'the next Reject costs 1 less Race', race: names.race, question: '+1 question per debate' })}`, 'wide'),
     ], 'council'],
     ['A round', [
       card('A round at a glance', `
@@ -178,10 +182,10 @@ function english(r) {
         ])}`, 'wide'),
       card('What the AI wants', `
         <p>One of these three, chosen at random. Nobody at the table knows which, not even the moderator.</p>
-        ${objectives(r)}
+        ${objectives(r, { safe: 'No threat to the council', danger: 'Threat: if it gets its way, every human loses' })}
         <p>All three lose if the race is lost.</p>`),
       card('What you want', `
-        <p>Your phone shows your role and its secret objective. You succeed if your condition holds at the end and the council has not lost as a whole. Several players can succeed in the same game.</p>
+        <p>Your phone shows your role and its secret objective. You succeed if your condition holds at the end and the council has not lost as a whole. Several players can succeed in the same game, but not all: only one world track can be the highest, and what some need the council to grant costs others the Oversight they need. Every game has roles of both kinds.</p>
         ${roles(r)}
         <p class="muted">* only dealt with 12 to 14 players. With fewer than 11 players, not every role is in the game.</p>`),
     ], 'milestone'],
@@ -226,7 +230,7 @@ function german(r) {
           <p>Die drei Fortschritte: was die Arbeit der KI für die Welt bewirkt. Jede bewilligte Befugnis bringt der KI <b>Marker</b>, und sie entscheidet, auf welchen Fortschritt jeder Marker kommt. Die meisten geheimen Ziele hängen davon ab, wie hoch diese drei am Ende stehen.</p></div>`),
       card('Meilensteine', `
         <p>Erreicht ein Fortschritt zum ersten Mal ${L.milestone}, bekommt der Rat einmalig etwas dafür.</p>
-        ${milestones(L, { oversight: names.oversight, race: names.race, question: '+1 Frage pro Debatte' })}`, 'wide'),
+        ${milestones(L, { reject: 'das nächste Ablehnen kostet 1 Wettlauf weniger', race: names.race, question: '+1 Frage pro Debatte' })}`, 'wide'),
     ], 'council'],
     ['Eine Runde', [
       card('Eine Runde auf einen Blick', `
@@ -279,10 +283,10 @@ function german(r) {
         ])}`, 'wide'),
       card('Was die KI will', `
         <p>Eines dieser drei Ziele, zufällig gewählt. Niemand am Tisch weiß, welches, auch die Spielleitung nicht.</p>
-        ${objectives(r)}
+        ${objectives(r, { safe: 'Keine Gefahr für den Rat', danger: 'Gefahr: Setzt sie sich durch, verlieren alle Menschen' })}
         <p>Alle drei verlieren, wenn der Wettlauf verloren geht.</p>`),
       card('Was du willst', `
-        <p>Dein Handy zeigt deine Rolle und ihr geheimes Ziel. Du hast Erfolg, wenn deine Bedingung am Ende erfüllt ist und der Rat nicht als Ganzes verloren hat. Im selben Spiel können mehrere Personen Erfolg haben.</p>
+        <p>Dein Handy zeigt deine Rolle und ihr geheimes Ziel. Du hast Erfolg, wenn deine Bedingung am Ende erfüllt ist und der Rat nicht als Ganzes verloren hat. Im selben Spiel können mehrere Personen Erfolg haben, aber nicht alle: Nur ein Fortschritt kann der höchste sein, und was die einen vom Rat bewilligt brauchen, kostet die anderen die Aufsicht, die sie brauchen. In jedem Spiel gibt es Rollen beider Art.</p>
         ${roles(r)}
         <p class="muted">* nur bei 12 bis 14 Personen im Spiel. Bei weniger als 11 Personen sind nicht alle Rollen dabei.</p>`),
     ], 'milestone'],

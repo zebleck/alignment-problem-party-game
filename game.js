@@ -2,7 +2,7 @@
 // validated here, and all track changes happen in this file.
 
 import crypto from 'node:crypto';
-import { LIMITS, WORLD, ROUNDS, AI_OBJECTIVES, ROLES, EXTRA_ROLES, MAX_PLAYERS, LANGUAGES, HEADLINES, MILESTONES, roundFor, objectiveFor, roleFor, headlineFor } from './data.js';
+import { LIMITS, WORLD, ROUNDS, AI_OBJECTIVES, ROLES, EXTRA_ROLES, MAX_PLAYERS, LANGUAGES, HEADLINES, MILESTONES, roundFor, objectiveFor, roleFor, headlineFor, dealRoles } from './data.js';
 import { tr, trackName } from './messages.js';
 
 const clampInt = (n) => (Number.isFinite(+n) ? Math.max(0, Math.round(+n)) : 0);
@@ -214,7 +214,9 @@ export class Game {
     const key = this.headline?.key;
     if (key === 'protests' && result === 'rejected') n -= 1;
     if (key === 'demo' && result !== 'full') n += 1;
-    return n;
+    // The Welfare milestone pays once: the next Reject costs one less.
+    if (result === 'rejected' && this.milestones.welfare && !this.milestones.welfareUsed) n -= 1;
+    return Math.max(0, n);
   }
 
   tokensFor(result) {
@@ -234,7 +236,6 @@ export class Game {
     for (const k of WORLD) {
       if (this.milestones[k] || this.tracks[k] < LIMITS.milestone) continue;
       this.milestones[k] = true;
-      if (k === 'welfare') this.tracks.oversight += 1;
       if (k === 'prosperity') this.tracks.race = Math.max(0, this.tracks.race - 1);
       this.note('milestone', `${k} reached ${LIMITS.milestone} for the first time. The council gains: ${MILESTONES[k]}. Race is now ${this.tracks.race}, Oversight ${this.tracks.oversight}.`);
     }
@@ -348,9 +349,7 @@ export class Game {
     if (this.phase !== 'lobby') throw new Error(this.e('The game is already running.'));
     if (this.players.length < 3) throw new Error(this.e('At least 3 players are needed (6 or more recommended).'));
     const n = this.players.length;
-    const roles = n <= ROLES.length
-      ? shuffle(ROLES, this.rng).slice(0, n)
-      : shuffle([...ROLES, ...shuffle(EXTRA_ROLES, this.rng).slice(0, n - ROLES.length)], this.rng);
+    const roles = dealRoles(n, (list) => shuffle(list, this.rng));
     this.players.forEach((p, i) => {
       p.role = roles[i].key;
       p.inbox = [];
@@ -559,6 +558,7 @@ export class Game {
     this.permissions[info.key] = result;
     const tokens = this.tokensFor(result);
     this.tracks.race += this.raceCost(result);
+    if (result === 'rejected' && this.milestones.welfare) this.milestones.welfareUsed = true;
     if (result === 'full') this.tracks.oversight -= 1;
     let extra = '';
     if (info.key === 'infrastructure' && result === 'rejected') {

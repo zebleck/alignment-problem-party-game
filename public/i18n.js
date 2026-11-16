@@ -182,6 +182,7 @@ const DE = {
   'Then read out the headline. It applies to this round only.': 'Lies danach die Schlagzeile vor. Sie gilt nur für diese Runde.',
   'at {n}:': 'bei {n}:',
   'Oversight +1': 'Aufsicht +1',
+  'next Reject: Race −1': 'nächstes Ablehnen: Wettlauf −1',
   '+1 question per debate': '+1 Frage pro Debatte',
   'Race −1': 'Wettlauf −1',
   'no tokens': 'keine Marker',

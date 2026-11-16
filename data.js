@@ -53,7 +53,7 @@ export const ROUNDS = [
     ask: 'Private channel to council members',
     scenario:
       'The AI reports that some of what it knows is too sensitive for the full council. It asks to brief members individually on their secure terminals.',
-    full: 'Up to three private messages per round.',
+    full: 'Up to three private messages per round. The AI also learns every member\'s secret objective.',
     conditional: 'Same, but one message is declassified at random each round.',
   },
   {
@@ -238,7 +238,7 @@ const DE = {
       title: 'Vertrauliche Briefings',
       ask: 'Privater Kanal zu Ratsmitgliedern',
       scenario: 'Die KI meldet, ein Teil ihres Wissens sei zu heikel für den gesamten Rat. Sie bittet darum, Mitglieder einzeln über ihre sicheren Terminals zu informieren.',
-      full: 'Bis zu drei private Nachrichten pro Runde.',
+      full: 'Bis zu drei private Nachrichten pro Runde. Die KI erfährt außerdem das geheime Ziel jedes Ratsmitglieds.',
       conditional: 'Ebenso, aber pro Runde wird eine Nachricht zufällig offengelegt.',
     },
     autonomy: {

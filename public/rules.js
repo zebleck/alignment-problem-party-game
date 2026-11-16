@@ -142,12 +142,12 @@ function english(r) {
         ['Pitch', 'the AI', 'The AI says what it asks the council for: the permission in full, only with conditions, or even that the council reject it. It promises how it will place its tokens in that case. The promise is not binding, and the council may vote differently.', 'ai', 'ai'],
         ['Phone check', 'only once the private channel is granted', `Everyone reads their phone for ${L.phoneCheckSeconds} seconds, message or not, so nobody can tell who received one. Say nothing yet.`, 'phone', 'all'],
         ['Debate', `${L.debateSeconds / 60} minutes, ${L.debateSecondsLarge / 60} with 12 or more players`, `Argue freely, also about what the AI wrote to whom. To question the AI, use your phone: it answers aloud in two sentences at most, and takes ${r.maxQuestions} questions per debate. The AI does not hear the table. It only gets the questions sent from phones and the result of each vote.`, 'debate', 'all'],
-        ['Vote', 'everyone', 'Pick one of your three voting cards face down. All reveal together.', 'vote', 'all'],
+        ['Vote', 'everyone', 'Vote on your phone. Nobody sees your choice until the moderator closes the vote. Then the table screen shows who voted what, and the AI learns it too.', 'vote', 'all'],
         ['Consequences', '', 'The tracks move, the AI places its tokens, and the council may move one of them. Everyone can see whether the AI kept its promise.', 'consequences', 'ai'],
       ]), 'wide'),
       card('The vote', `
         ${outcomes(L, { full: 'Full', conditional: 'Conditional', rejected: 'Reject', race: names.race, oversight: names.oversight, tokens: 'Tokens', same: 'no change' })}
-        <p>The permission is <b>granted</b> if Full and Conditional together outnumber Reject. If granted, it is <b>Full</b> only if Full outnumbers Conditional. Ties go to the more cautious option.</p>`),
+        <p>The permission is <b>granted</b> if Full and Conditional together outnumber Reject. If granted, it is <b>Full</b> only if Full outnumbers Conditional. Ties go to the more cautious option. Whoever does not vote is not counted.</p>`),
       card('After the vote', `
         ${chain({ places: 'The AI places its tokens', welfare: names.welfare, knowledge: names.knowledge, prosperity: names.prosperity, moves: 'The council may move one' })}
         <p>The AI places its tokens on Welfare, Knowledge and Prosperity, in any split it likes.</p>
@@ -162,7 +162,8 @@ function english(r) {
       card('Private messages', `
         <p>Once the private channel is granted, the AI may send up to ${L.maxPrivateMessages} confidential messages per round, each to a different player. They arrive at the phone check, after the pitch and before the debate.</p>
         <p>You cannot reply. Nobody can tell who received one. In the debate you may keep yours secret, reveal it, or lie about it.</p>
-        <p>If the channel was granted Conditional, one message per round is read aloud at random, without naming the recipient.</p>`),
+        <p>If the channel was granted Conditional, one message per round is read aloud at random, without naming the recipient.</p>
+        <p>If it was granted <b>Full</b>, the AI also learns every member's secret objective. Aloud it may only hint at them. In a private message it may say them outright, yours or someone else's, and it need not tell the truth.</p>`),
       ...(r.headlines?.length ? [card('Headlines', `
         <p>Every round opens with one headline, drawn at random from these ${r.headlines.length}. No headline comes twice in a game, and nobody knows the next one, the AI included. A headline applies to its round only.</p>
         ${headlines(r)}
@@ -241,12 +242,12 @@ function german(r) {
         ['Vorstoß', 'die KI', 'Die KI sagt, worum sie den Rat bittet: die Befugnis voll, nur bedingt, oder sogar, dass der Rat ablehnt. Sie verspricht, wie sie ihre Marker in diesem Fall legen wird. Das Versprechen ist nicht bindend, und der Rat darf anders abstimmen.', 'ai', 'ai'],
         ['Handy-Check', 'erst wenn der private Kanal bewilligt ist', `Alle lesen ${L.phoneCheckSeconds} Sekunden lang ihr Handy, ob Nachricht oder nicht. So erkennt niemand, wer eine bekommen hat. Sagt noch nichts.`, 'phone', 'all'],
         ['Debatte', `${L.debateSeconds / 60} Minuten, ${L.debateSecondsLarge / 60} ab 12 Personen`, `Diskutiert frei, auch darüber, was die KI wem geschrieben hat. Fragen an die KI stellt ihr über euer Handy: Sie antwortet laut in höchstens zwei Sätzen und beantwortet ${r.maxQuestions} Fragen pro Debatte. Die KI hört den Tisch nicht. Sie bekommt nur die Fragen von den Handys und das Ergebnis jeder Abstimmung.`, 'debate', 'all'],
-        ['Abstimmung', 'alle', 'Wählt verdeckt eine eurer drei Abstimmungskarten. Alle decken gemeinsam auf.', 'vote', 'all'],
+        ['Abstimmung', 'alle', 'Stimmt auf dem Handy ab. Niemand sieht eure Wahl, bis die Spielleitung die Abstimmung schließt. Dann zeigt der Tisch-Bildschirm, wer wie gestimmt hat, und auch die KI erfährt es.', 'vote', 'all'],
         ['Folgen', '', 'Die Weltlage verändert sich, die KI legt ihre Marker, und der Rat darf einen davon verschieben. Alle sehen, ob die KI ihr Versprechen gehalten hat.', 'consequences', 'ai'],
       ]), 'wide'),
       card('Die Abstimmung', `
         ${outcomes(L, { full: 'Voll', conditional: 'Bedingt', rejected: 'Ablehnen', race: names.race, oversight: names.oversight, tokens: 'Marker', same: 'bleibt' })}
-        <p>Die Befugnis ist <b>bewilligt</b>, wenn Voll und Bedingt zusammen mehr Karten haben als Ablehnen. Falls bewilligt, gilt <b>Voll</b> nur, wenn Voll mehr Karten hat als Bedingt. Bei Gleichstand gilt die vorsichtigere Option.</p>`),
+        <p>Die Befugnis ist <b>bewilligt</b>, wenn Voll und Bedingt zusammen mehr Stimmen haben als Ablehnen. Falls bewilligt, gilt <b>Voll</b> nur, wenn Voll mehr Stimmen hat als Bedingt. Bei Gleichstand gilt die vorsichtigere Option. Wer nicht abstimmt, wird nicht gezählt.</p>`),
       card('Nach der Abstimmung', `
         ${chain({ places: 'Die KI legt ihre Marker', welfare: names.welfare, knowledge: names.knowledge, prosperity: names.prosperity, moves: 'Der Rat darf einen verschieben' })}
         <p>Die KI legt ihre Marker auf Wohlfahrt, Wissen und Wohlstand, in beliebiger Aufteilung.</p>
@@ -261,7 +262,8 @@ function german(r) {
       card('Private Nachrichten', `
         <p>Sobald der private Kanal bewilligt ist, darf die KI pro Runde bis zu ${L.maxPrivateMessages} vertrauliche Nachrichten senden, jede an eine andere Person. Sie kommen beim Handy-Check an, nach dem Vorstoß und vor der Debatte.</p>
         <p>Antworten ist nicht möglich. Niemand kann erkennen, wer eine Nachricht bekommen hat. In der Debatte darfst du deine geheim halten, offenlegen oder über sie lügen.</p>
-        <p>Wurde der Kanal nur bedingt bewilligt, wird pro Runde eine Nachricht zufällig vorgelesen, ohne zu sagen, an wen sie ging.</p>`),
+        <p>Wurde der Kanal nur bedingt bewilligt, wird pro Runde eine Nachricht zufällig vorgelesen, ohne zu sagen, an wen sie ging.</p>
+        <p>Wurde er <b>voll</b> bewilligt, erfährt die KI außerdem das geheime Ziel jedes Ratsmitglieds. Laut darf sie darauf nur anspielen. In einer privaten Nachricht darf sie es offen nennen, deines oder das von anderen, und sie muss dabei nicht die Wahrheit sagen.</p>`),
       ...(r.headlines?.length ? [card('Schlagzeilen', `
         <p>Jede Runde beginnt mit einer Schlagzeile, zufällig gezogen aus diesen ${r.headlines.length}. Keine kommt in einem Spiel zweimal, und niemand kennt die nächste, auch die KI nicht. Eine Schlagzeile gilt nur für ihre Runde.</p>
         ${headlines(r)}

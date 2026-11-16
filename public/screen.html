@@ -50,7 +50,7 @@
 </div>
 
 <script type="module">
-import { connect, esc, $, t, icon, roleIcon, aiFigure, promiseLabel, askChip, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined, voteEffect, headlineHtml } from '/common.js';
+import { connect, esc, $, t, icon, roleIcon, aiFigure, promiseLabel, askChip, votesHtml, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined, voteEffect, headlineHtml } from '/common.js';
 import { rulesOverlay, setRulesTab } from '/rules.js';
 import { autoFit } from '/fit.js';
 
@@ -276,7 +276,7 @@ function mainHtml(s) {
       const asked = (v) => (v === want ? `<div class="option-promise">${t('The AI asks for this.')} ${promiseLabel(v)}: ${promiseLine(s.pitch.promise)}</div>` : '');
       const option = (status, general, specific, extra = '') => `
         <div class="option ${status}">${chip(status)}<div class="option-general">${general}</div><div>${specific}</div>${extra}</div>`;
-      return focus(esc(r.ask), t('Pick a voting card face down. All reveal together.'), `
+      return focus(esc(r.ask), `${t('Vote on your phone. All votes are revealed together.')} <span class="vote-count">${t('{n} of {total} have voted', { n: s.votesCast || 0, total: s.players.length })}</span>`, `
         <div class="options">
           ${option('full', voteEffect(s, 'full'), esc(r.full), asked('full'))}
           ${option('conditional', voteEffect(s, 'conditional'), esc(r.conditional), asked('conditional'))}
@@ -301,7 +301,7 @@ function mainHtml(s) {
       const rule = s.phase !== 'adjust' ? '' : s.moveRule === 'two-thirds'
         ? `<p><b>${t('Council: you may move one token, but it needs a two-thirds vote.')}</b></p>`
         : `<p><b>${t('Council: you may move one token by majority vote.')}</b></p>`;
-      return `<div class="panel verdict"><div class="label">${esc(r.ask)} · ${t('Result')}</div><div class="big">${chip(verdict)}</div>
+      return `<div class="panel verdict"><div class="label">${esc(r.ask)} · ${t('Result')}</div><div class="big">${chip(verdict)}</div>${votesHtml(s.lastVote)}
         ${s.placement ? placementHtml(s.placement) : s.phase === 'roundend' ? `<p class="muted">${t('No tokens were placed this round.')}</p>` : ''}${rule}${headlineHtml(s)}</div>${ai('compact')}`;
     }
   }

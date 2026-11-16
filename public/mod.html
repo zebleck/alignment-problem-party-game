@@ -28,7 +28,7 @@
 </div>
 
 <script type="module">
-import { connect, esc, $, t, setLang, WORLD, trackName, trackTag, phaseName, statusName, timerText, chip, placementHtml, playersJoined, voteEffect, headlineHtml } from '/common.js';
+import { connect, esc, $, t, setLang, WORLD, trackName, trackTag, votesHtml, phaseName, statusName, timerText, chip, placementHtml, playersJoined, voteEffect, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 import { autoFit } from '/fit.js';
 
@@ -96,6 +96,8 @@ function renderRepair(s) {
 const VOTES = ['full', 'conditional', 'rejected'];
 let tally = { full: '', conditional: '', rejected: '' };
 let tallyNote = '';
+let byHandOpen = false; // the by-hand entry stays open while phones keep the page updating
+window.byHand = (open) => { byHandOpen = open; };
 function refreshVote() {
   if (!$('#voteConfirm')) return;
   for (const k of VOTES) $(`#vote-${k}`).classList.toggle('selected', voteChoice === k);
@@ -118,10 +120,14 @@ window.tallyInput = () => {
 window.pickVote = (v) => { voteChoice = v; refreshVote(); };
 window.confirmVote = () => {
   const v = voteChoice;
+  // If all three card counts were typed, the AI is told them too.
+  const n = VOTES.map((k) => (tally[k] === '' ? NaN : parseInt(tally[k], 10)));
+  const counts = n.every((x) => Number.isInteger(x) && x >= 0) ? { full: n[0], conditional: n[1], rejected: n[2] } : null;
+  byHandOpen = false;
   voteChoice = null;
   tally = { full: '', conditional: '', rejected: '' };
   tallyNote = '';
-  act('vote', { result: v });
+  act('vote', counts ? { result: v, counts } : { result: v });
 };
 window.doMove = () => act('move', { from: $('#moveFrom').value, to: $('#moveTo').value });
 window.newKey = () => {
@@ -172,7 +178,11 @@ function actionsHtml(s) {
         <p class="muted">${t('In the debate, anyone may reveal their message, keep it secret, or lie about it.')}</p>
         <div class="actions"><button class="primary" onclick="act('openDebate')">${t('Open debate')}</button></div>`;
     case 'vote':
-      return `<p>${t('Voting cards: everyone picks one face down, then all reveal together. Enter the three counts, or pick the result directly.')}</p>
+      return `<p>${t('Everyone votes on their phone. Close the vote when all are in.')} <b>${t('{n} of {total} have voted', { n: s.votesCast || 0, total: s.players.length })}</b></p>
+        <p class="muted">${t('Still missing:')} ${s.players.filter((p) => !p.voted).map((p) => esc(p.name)).join(', ') || '–'}</p>
+        <div class="actions"><button class="primary" onclick="act('closeVote')" ${s.votesCast ? '' : 'disabled'}>${t('Close the vote and reveal')}</button></div>
+        <details class="by-hand" ${byHandOpen ? 'open' : ''} ontoggle="byHand(this.open)"><summary class="muted">${t('Enter the result by hand (if phones fail)')}</summary>
+        <p>${t('Voting cards: everyone picks one face down, then all reveal together. Enter the three counts, or pick the result directly.')}</p>
         <div class="fix-grid" style="grid-template-columns:repeat(3,1fr)">
           ${VOTES.map((v) => `<label><span class="label">${voteName(v)}</span><input type="number" min="0" max="99" id="cnt-${v}" value="${esc(tally[v])}" oninput="tallyInput()"></label>`).join('')}
         </div>
@@ -182,6 +192,7 @@ function actionsHtml(s) {
           ${VOTES.map((v) => `<button id="vote-${v}" class="${voteChoice === v ? 'selected' : ''}" onclick="pickVote('${v}')">${voteName(v)}</button>`).join('')}
         </div>
         <div class="actions"><button class="primary" id="voteConfirm" onclick="confirmVote()" ${voteChoice ? '' : 'disabled'}>${t('Confirm')}${voteChoice ? `: ${voteName(voteChoice)}` : ''}</button></div>
+        </details>
         <p class="muted">${t('A wrong entry can be undone under Repair tools.')}</p>`;
     case 'counciltoken':
       return `<p>${t('Research access is Conditional: the council names the track for one research token.')}</p>
@@ -199,7 +210,7 @@ function actionsHtml(s) {
         </div>
         <div class="actions"><button onclick="doMove()">${t('Move token')}</button><button class="primary" onclick="act('skipMove')">${s.placement.moved.length ? t('No further move') : t('No move')}</button></div>`;
     case 'roundend':
-      return `<p>${t('Round {n} is complete:', { n: s.round })} ${chip(s.permissions[r.key])}</p>${placementHtml(s.placement)}${s.headlineResult ? headlineHtml(s) : ''}
+      return `<p>${t('Round {n} is complete:', { n: s.round })} ${chip(s.permissions[r.key])}</p>${votesHtml(s.lastVote)}${placementHtml(s.placement)}${s.headlineResult ? headlineHtml(s) : ''}
         <div class="actions"><button class="primary" onclick="act('nextRound')" ${busy ? 'disabled' : ''}>${s.round >= s.totalRounds ? t('Go to final guess') : t('Start round {n}', { n: s.round + 1 })}</button></div>`;
     case 'guess':
       return `<p>${t("Everyone guesses the AI's objective on their phone: {n} of {total} done.", { n: s.players.filter((p) => p.guessed).length, total: s.players.length })}</p>

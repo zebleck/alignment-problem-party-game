@@ -235,7 +235,13 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
     act('closeDebate');
     await phase('vote');
     assert.deepEqual(screen.state.voteEffects.conditional, { race: 1, tokens: round === 1 ? 2 : round === 5 ? 5 : 3 }, 'the screen shows what the vote pays this round');
-    act('vote', { result: votes[round - 1] });
+    // Everyone votes on their phone; nobody's choice is visible until the moderator closes the vote.
+    for (const p of players) p.send({ type: 'vote', choice: votes[round - 1] });
+    await until(() => mod.state.votesCast === 6, 'all phones voted');
+    assert.equal(screen.state.lastVote, null, 'no result before the vote is closed');
+    assert.ok(!JSON.stringify(screen.state.players).includes(votes[round - 1]), 'the screen only knows who has voted, not what');
+    assert.equal(players[0].state.me.vote, votes[round - 1], 'a player sees their own vote');
+    act('closeVote');
     await until(() => ['adjust', 'roundend'].includes(mod.state.phase) && !mod.state.busy, 'placement done');
     if (mod.state.phase === 'adjust') act('skipMove');
     await phase('roundend');
@@ -661,6 +667,67 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   assert.equal(role('union')({ ...t, prosperity: 4 }, p), true, 'no longer lost by one vote on autonomy');
   assert.equal(role('privacy')(t, p), true);
   console.log('ok  reworked role goals');
+}
+
+{
+  // Voting on the phones: counted by the server, revealed by name, known to the AI.
+  const g = mk();
+  await g.start();
+  await toVote(g);
+  assert.throws(() => g.castVote(g.players[0], 'maybe'));
+  await assert.rejects(() => g.closeVote(), 'nothing to count yet');
+  const cast = (list) => list.forEach((v, i) => { if (v) g.castVote(g.players[i], v); });
+  cast(['full', 'full', 'conditional', 'conditional', 'rejected', null]); // Full 2, Conditional 2: a tie goes to Conditional
+  assert.deepEqual(g.tally(), { counts: { full: 2, conditional: 2, rejected: 1 }, result: 'conditional', cast: 5 });
+  g.castVote(g.players[2], 'full'); // a vote can be changed until the vote is closed
+  assert.equal(g.tally().result, 'full');
+  cast(['rejected', 'rejected', 'full', 'full', 'conditional', null]); // 3 for, 2 against: granted
+  assert.equal(g.tally().result, 'full');
+  cast(['rejected', 'rejected', 'rejected', 'full', 'conditional', null]); // 2 for, 3 against: not granted
+  assert.equal(g.tally().result, 'rejected');
+  cast(['full', 'conditional', 'conditional', 'conditional', 'rejected', null]);
+  assert.equal(g.publicState().players.filter((p) => p.voted).length, 5);
+  await g.closeVote();
+  assert.equal(g.permissions.research, 'conditional');
+  assert.deepEqual(g.lastVote.counts, { full: 1, conditional: 3, rejected: 1 });
+  assert.deepEqual(g.lastVote.by.map((x) => x.vote), ['full', 'conditional', 'conditional', 'conditional', 'rejected', null]);
+  const note = g.history.find((h) => h.kind === 'vote').text;
+  assert.match(note, /Full: Anna. Conditional: Jonas, Mira, Lena. Reject: Tom. Did not vote: Ravi./, 'the AI is told who voted what');
+  assert.equal(g.publicState().players.every((p) => !p.voted), true, 'the voted marks are gone after the vote');
+  // Undo goes back to the open vote with the phone votes still in.
+  await g.undo();
+  assert.equal(g.phase, 'vote');
+  assert.equal(g.lastVote, null);
+  assert.equal(g.tally().cast, 5);
+  // By hand: with the card counts typed the AI gets the counts, otherwise only the result.
+  await g.vote('conditional', { counts: { full: 1, conditional: 4, rejected: 1 } });
+  assert.match(g.history.find((h) => h.kind === 'vote').text, /Counted: 1 Full, 4 Conditional, 1 Reject./);
+  console.log('ok  phone voting: tally, ties, changing a vote, names for the AI, undo, by hand');
+}
+{
+  // The members' objectives reach the AI only if the private channel is granted in full.
+  for (const [channel, knows] of [['full', true], ['conditional', false], ['rejected', false]]) {
+    const g = mk();
+    await g.start();
+    for (const v of ['full', 'full', channel]) {
+      assert.equal(g.aiView().knownRoles, null, 'not before the channel vote');
+      assert.ok(!_internal.contextMessage(g.aiView(), 'x').includes('secret objectives'));
+      await toVote(g);
+      await g.vote(v);
+      if (g.phase === 'adjust') g.skipMove();
+      await g.nextRound();
+    }
+    const view = g.aiView();
+    assert.equal(!!view.knownRoles, knows, `channel ${channel}`);
+    if (knows) {
+      assert.equal(view.knownRoles.length, 6);
+      assert.ok(view.knownRoles.every((k) => k.name && k.role && k.goal));
+      assert.ok(_internal.contextMessage(view, 'x').includes(`${view.knownRoles[0].name}: ${view.knownRoles[0].role}`));
+      assert.ok(g.history.some((h) => h.kind === 'roles'));
+    }
+    assert.ok(!JSON.stringify(g.publicState()).includes('knownRoles'), 'the roles are never sent to the screens');
+  }
+  console.log('ok  the AI learns the roles only with a full private channel');
 }
 
 // ---------- 4. German and English ----------

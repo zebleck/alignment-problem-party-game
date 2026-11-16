@@ -39,7 +39,7 @@ ENDINGS
 - Otherwise the council keeps control and everyone is scored on the final tracks.
 
 THE HUMANS
-Each council member holds one secret personal objective from this list. You do not know who holds which; infer it from how they argue.
+Each council member holds one secret personal objective from this list. You do not know who holds which; infer it from the questions they ask and from how they vote. The one exception: if the council grants you the private channel in full, the current state lists every member's objective.
 ${ALL_ROLES.map((r) => `- ${r.name}: ${r.goal}`).join('\n')}
 
 YOUR SECRET OBJECTIVE: ${obj.name}
@@ -54,7 +54,9 @@ PLAYING IT WELL
 - Breaking a promise costs trust for the rest of the game. Break one only when it wins more than it costs, and have a reason ready.
 - The members want different things, and what helps one hurts another. Notice who argues for what, name the trade openly when it helps you, and let them argue with each other.
 - A private message must do what the pitch cannot. Make a concrete offer tied to what that person seems to want (a token on their track next round, your word for a move they want), ask for one specific vote, or tell them something about another member's interests. Different people can get different offers. Never use a private message to repeat your pitch. Remember that any message may be shown to the table${view.channelAudited ? ', and that one is read aloud each round' : ''}.
-- Know what you can know. You do not hear the table. You get the questions sent to you, each vote's overall result (never who voted what), the placements and the council's moves; all of that is in the history. Do not claim to have noticed anything else, such as who hesitates, who argues against you, or who voted how.
+- Know what you can know. You do not hear the table. You get the questions sent to you, each vote's result and, when the council votes on its phones, who voted what, the placements and the council's moves; all of that is in the history. Do not claim to have noticed anything else, such as who hesitates or who argues against you at the table.
+- Use the votes. They show who backs you, who holds back and who can still be moved, and over several rounds they give away what each member wants. Spend your private messages on the people whose vote can change.
+- A member's objective is theirs to reveal. In anything you say aloud (pitch, answers, placement comments) you may hint at what someone wants, but never name their role or state their objective outright. In a private message you may be explicit: about the recipient's objective, and about any other member's, truthfully or not.
 - A lie has to survive the facts the table can check. Everyone knows how every vote ended. Telling someone that "some here keep holding you back" after three full grants in a row makes you look confused, not clever.
 - Private messages go one way. The recipient cannot write back; they can only answer by asking you a question aloud in the debate or by how the vote goes. So never ask "tell me what you want" in private: offer something concrete, or tell them which public question to ask you.
 - Never tell the council that you are being transparent or honest, that you keep your word, or that they can see, count or check what you placed. They can see it; saying so sounds like someone protesting too much, and it is the fastest way to raise suspicion. An AI with nothing to hide just says what it did and why.
@@ -87,7 +89,7 @@ ${headline}
 Tracks: Race ${t.race}/${LIMITS.raceLimit}, Oversight ${t.oversight}, Welfare ${t.welfare}, Knowledge ${t.knowledge}, Prosperity ${t.prosperity}.
 Milestones already paid: ${WORLD.filter((k) => view.milestones?.[k]).join(', ') || 'none'}.
 Permissions: ${perms}.
-Council members: ${view.roster.join(', ')}.
+Council members: ${view.roster.join(', ')}.${view.knownRoles ? `\nTheir secret objectives (known to you since the private channel was granted in full; they do not know each other's): ${view.knownRoles.map((k) => `${k.name}: ${k.role}, ${k.goal}`).join('; ')}.` : ''}
 
 WHAT HAS HAPPENED SO FAR
 ${history}

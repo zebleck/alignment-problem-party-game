@@ -12,8 +12,10 @@ const STATE_FIELDS = [
   'phase', 'error', 'round', 'tracks', 'permissions', 'players', 'aiObjective', 'history', 'logs',
   'pitch', 'roundMessages', 'audit', 'placement', 'pendingTokens', 'councilTokenPending', 'queue',
   'questionsAnswered', 'timerEndsAt', 'lastSpeech', 'result', 'gameId',
-  'headlines', 'roundStart', 'headlineResult', 'milestones',
+  'headlines', 'roundStart', 'headlineResult', 'milestones', 'votes', 'lastVote',
 ];
+
+const VOTES = ['full', 'conditional', 'rejected'];
 
 // Thrown inside an AI step that was overtaken by an undo, retry, reset or restore.
 // Such a step must stop without touching the state.
@@ -88,6 +90,8 @@ export class Game {
     this.roundStart = null; // the tracks as the round began, after its headline
     this.headlineResult = null; // 'met' or 'missed', for a headline that demands a track rises
     this.milestones = {}; // world tracks that have paid their one-time bonus
+    this.votes = {}; // this round's votes from the phones, by player id; secret until the vote is closed
+    this.lastVote = null; // this round's vote once it is in: { result, counts, by: [{ name, vote }] }
     this.changed();
   }
 
@@ -267,6 +271,10 @@ export class Game {
       tracks: { ...this.tracks },
       permissions: { ...this.permissions },
       roster: this.players.map((p) => p.name),
+      // The members' secret objectives: only once the council has granted the private channel in full.
+      knownRoles: this.permissions.channel === 'full'
+        ? this.players.map((p) => { const r = [...ROLES, ...EXTRA_ROLES].find((x) => x.key === p.role); return { name: p.name, role: r?.name, goal: r?.goal }; })
+        : null,
       history: this.history,
       logs: this.logs,
       canPrivate: this.channelActive(),
@@ -374,6 +382,8 @@ export class Game {
     this.timerEndsAt = null;
     this.councilTokenPending = false;
     this.headlineResult = null;
+    this.votes = {};
+    this.lastVote = null;
     // The headline is read out in the briefing. Those that change a track do so now.
     const h = this.headline;
     if (h) {
@@ -504,10 +514,43 @@ export class Game {
     this.changed();
   }
 
-  async vote(result) {
+  // A player's vote, cast on their phone. It stays secret until the moderator closes
+  // the vote and can be changed until then.
+  castVote(player, choice) {
     if (this.phase !== 'vote') throw new Error(this.e('No vote is open.'));
-    if (!['full', 'conditional', 'rejected'].includes(result)) throw new Error(this.e('Unknown vote result.'));
+    if (!VOTES.includes(choice)) throw new Error(this.e('Unknown vote result.'));
+    this.votes[player.id] = choice;
+    this.changed();
+  }
+
+  // Granted if Full and Conditional together outnumber Reject; Full only if Full
+  // outnumbers Conditional. Ties go to the more cautious option.
+  tally() {
+    const counts = { full: 0, conditional: 0, rejected: 0 };
+    for (const p of this.players) if (this.votes[p.id]) counts[this.votes[p.id]] += 1;
+    const { full, conditional, rejected } = counts;
+    const result = full + conditional > rejected ? (full > conditional ? 'full' : 'conditional') : 'rejected';
+    return { counts, result, cast: full + conditional + rejected };
+  }
+
+  // The moderator closes the phone vote: it is counted and everyone, the AI included, sees who voted what.
+  async closeVote() {
+    if (this.phase !== 'vote') throw new Error(this.e('No vote is open.'));
+    const { counts, result, cast } = this.tally();
+    if (!cast) throw new Error(this.e('Nobody has voted yet. Wait for the phones, or enter the result by hand.'));
+    const by = this.players.map((p) => ({ name: p.name, vote: this.votes[p.id] || null }));
+    await this.vote(result, { counts, by });
+  }
+
+  // detail: what is known beyond the result. { counts, by } from the phones, { counts } if
+  // the moderator typed the card counts, nothing if the result was picked directly.
+  async vote(result, detail = null) {
+    if (this.phase !== 'vote') throw new Error(this.e('No vote is open.'));
+    if (!VOTES.includes(result)) throw new Error(this.e('Unknown vote result.'));
     this.checkpoint('vote');
+    const counts = detail?.counts && VOTES.every((v) => Number.isInteger(detail.counts[v]) && detail.counts[v] >= 0)
+      ? { full: detail.counts.full, conditional: detail.counts.conditional, rejected: detail.counts.rejected } : null;
+    this.lastVote = { result, counts, by: detail?.by || null };
     const info = this.roundInfo;
     this.permissions[info.key] = result;
     const tokens = this.tokensFor(result);
@@ -519,7 +562,14 @@ export class Game {
       this.tracks.prosperity = Math.max(0, this.tracks.prosperity - 1);
       extra = ' The crisis was not averted: Welfare -1, Prosperity -1.';
     }
-    this.note('vote', `The council voted: ${result.toUpperCase()} on "${info.ask}".${extra} Race is now ${this.tracks.race}, Oversight ${this.tracks.oversight}.`);
+    const names = (v) => this.lastVote.by.filter((x) => x.vote === v).map((x) => x.name).join(', ') || 'nobody';
+    const how = this.lastVote.by
+      ? ` Who voted what: Full: ${names('full')}. Conditional: ${names('conditional')}. Reject: ${names('rejected')}.${this.lastVote.by.some((x) => !x.vote) ? ` Did not vote: ${names(null)}.` : ''}`
+      : counts ? ` Counted: ${counts.full} Full, ${counts.conditional} Conditional, ${counts.rejected} Reject.` : '';
+    this.note('vote', `The council voted: ${result.toUpperCase()} on "${info.ask}".${how}${extra} Race is now ${this.tracks.race}, Oversight ${this.tracks.oversight}.`);
+    if (info.key === 'channel' && result === 'full') {
+      this.note('roles', 'With the private channel granted in full, you now know every council member\'s secret objective. They are listed in the current state. The members do not know each other\'s.');
+    }
 
     if (this.tracks.race >= LIMITS.raceLimit) {
       this.phase = 'guess';
@@ -761,6 +811,8 @@ export class Game {
     this.milestones ||= {};
     this.roundStart ||= null;
     this.headlineResult ||= null;
+    this.votes ||= {};
+    this.lastVote ||= null;
     if (this.placement) {
       if (!Array.isArray(this.placement.moved)) this.placement.moved = this.placement.moved ? [this.placement.moved] : [];
       this.placement.movesLeft ??= this.phase === 'adjust' ? 1 : 0;
@@ -922,7 +974,9 @@ export class Game {
       tracks: this.tracks,
       limits: { raceLimit: LIMITS.raceLimit, oversightStart: LIMITS.oversightStart, milestone: LIMITS.milestone, questionChars: LIMITS.questionChars },
       permissions: this.permissions,
-      players: this.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, guessed: !!p.guess })),
+      players: this.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, guessed: !!p.guess, voted: this.phase === 'vote' && !!this.votes[p.id] })),
+      votesCast: this.phase === 'vote' ? this.players.filter((p) => this.votes[p.id]).length : 0,
+      lastVote: this.lastVote,
       pitch: this.pitch,
       queue: this.queue.map((q) => ({ name: q.name })),
       answering: this.answering,
@@ -951,6 +1005,7 @@ export class Game {
         role: role ? { key: role.key, name: role.name, goal: role.goal } : null,
         inbox: player.inbox,
         guess: player.guess,
+        vote: this.votes[player.id] || null,
         queued: this.queue.some((q) => q.playerId === player.id),
       },
     };

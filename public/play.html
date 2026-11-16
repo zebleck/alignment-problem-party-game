@@ -50,6 +50,12 @@
       </div>
     </div>
 
+    <div class="panel hidden" id="votePanel">
+      <div class="label" id="voteTitle"></div>
+      <div id="voteBtns"></div>
+      <div class="muted" id="voteNote"></div>
+    </div>
+
     <div class="panel hidden" id="terminal">
       <div class="label" id="termTitle"></div>
       <div class="inbox-msg" id="termMsg"></div>
@@ -74,7 +80,7 @@
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
-import { connect, esc, $, t, N, icon, roleIcon, aiFigure, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
+import { connect, esc, $, t, N, icon, roleIcon, aiFigure, statusName, voteEffect, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 
 const rules = rulesOverlay();
@@ -215,7 +221,7 @@ const HINTS = {
   pitch: N('The AI is making its pitch. Listen.'),
   debate: N('Debate. Argue with the table, or question the AI below.'),
   phonecheck: N('Read your terminal. Everyone looks at their phone now. The debate follows.'),
-  vote: N('Vote with your cards: pick one face down. Phone face down too.'),
+  vote: N('Vote below. Nobody sees your choice until the vote is closed.'),
   counciltoken: N('The council names a track for the research token.'),
   placement: N('The AI is placing its tokens. Watch the screen.'),
   adjust: N('The council may move one token. Watch the screen.'),
@@ -262,6 +268,15 @@ function render() {
       : s.questionsLeft === 1 ? t('Ask the AI · 1 question left') : t('Ask the AI · {n} questions left', { n: s.questionsLeft });
     $('#askBtn').disabled = blocked;
     if (talkMode === 'idle') talk.disabled = blocked;
+  }
+
+  // vote: one tap, secret until the moderator closes the vote
+  $('#votePanel').classList.toggle('hidden', s.phase !== 'vote');
+  if (s.phase === 'vote') {
+    $('#voteTitle').textContent = `${t('Your vote')} · ${s.roundInfo.ask}`;
+    $('#voteBtns').innerHTML = ['full', 'conditional', 'rejected'].map((v) => `<button data-v="${v}" class="vote-btn ${v} ${me.vote === v ? 'selected' : ''}"><span class="c-${v}">${icon(v)}</span><span><b>${v === 'rejected' ? t('Reject') : statusName(v)}</b><br><span class="muted">${voteEffect(s, v)}</span></span></button>`).join('');
+    for (const b of $('#voteBtns').children) b.onclick = () => conn.send({ type: 'vote', choice: b.dataset.v });
+    $('#voteNote').textContent = me.vote ? t('Counted. You can change it until the moderator closes the vote.') : t('Secret until the moderator closes the vote.');
   }
 
   // terminal: every player sees an entry during the phone check, message or not

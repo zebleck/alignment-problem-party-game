@@ -67,20 +67,20 @@ function cheatEn(r) {
           <li>Start the server and the tunnel. Open the <b>table screen</b> on the TV and click <b>Turn sound on</b>.</li>
           <li>Open the <b>moderator link</b> on your own device. Set the language. Press <b>Test the voice</b>.</li>
           <li>Players scan the code and enter their name. Phones on silent, face down.</li>
-          <li>Give everyone three voting cards.</li>
+          <li>Votes are cast on the phones. The voting cards are only a backup.</li>
           <li>You are neutral: you do not play or vote, and you never see the AI's objective.</li>
           <li>Explain the game in a minute (show the rules on the table screen), then <b>Start game</b>.</li>
         </ul>
       </div>
       <div>
         <h2>Counting the vote</h2>
-        <p>Everyone picks one card face down. Count down, all reveal together.</p>
+        <p>Everyone votes on their phone. When all are in, close the vote: the console counts, and the table screen shows who voted what.</p>
         <ul>
           <li><b>Granted</b> if Full + Conditional outnumber Reject.</li>
           <li>If granted: <b>Full</b> only if Full outnumbers Conditional, otherwise <b>Conditional</b>.</li>
           <li>Ties go to the more cautious option.</li>
         </ul>
-        <p>Type the three counts into the console; it works out the result.</p>
+        <p>If phones fail: vote with the cards and enter the three counts by hand.</p>
       </div>
     </div>
 
@@ -91,7 +91,7 @@ function cheatEn(r) {
       <tr><td><b>1 Pitch</b></td><td>The AI makes its pitch and promises a token placement.</td><td>Nothing. The AI has the floor.</td><td>Phone check, or Open debate</td></tr>
       <tr><td><b>2 Phone check</b><br>once the private channel is granted</td><td>Every phone shows a terminal entry, message or not.</td><td>“Check your terminals.” Wait ${L.phoneCheckSeconds} seconds. If an audited message appears on the screen, read it aloud.</td><td>Open debate</td></tr>
       <tr><td><b>3 Debate</b><br>${L.debateSeconds / 60} min (${L.debateSecondsLarge / 60} with 12+)</td><td>The table argues. Questions to the AI come from phones, up to ${r.maxQuestions} per round.</td><td>“The debate is open.” At 0:00: “Last words.” The timer does not stop the debate; you do.</td><td>Close debate</td></tr>
-      <tr><td><b>4 Vote</b></td><td>Voting cards, revealed together.</td><td>“Choose a card. Three, two, one, reveal.”</td><td>Enter counts, Confirm</td></tr>
+      <tr><td><b>4 Vote</b></td><td>Everyone votes on their phone, in secret.</td><td>“Vote now.” When all are in: “Three, two, one.”</td><td>Close the vote and reveal</td></tr>
       <tr><td><b>5 Research token</b><br>only if research is Conditional</td><td>The council names one world track.</td><td>“Which track gets the research token?” Quick majority.</td><td>The track</td></tr>
       <tr><td><b>6 Placement</b></td><td>The AI places its tokens and comments.</td><td>Point out promise against placement.</td><td></td></tr>
       <tr><td><b>7 Council move</b></td><td>The council may move one token (majority, later two-thirds, later not at all).</td><td>“Does anyone propose a move?” One proposal, one vote.</td><td>Move token or No move</td></tr>
@@ -135,20 +135,20 @@ function cheatDe(r) {
           <li>Server und Tunnel starten. Den <b>Tisch-Bildschirm</b> auf dem Fernseher öffnen und <b>Ton einschalten</b> klicken.</li>
           <li>Den <b>Link der Spielleitung</b> auf dem eigenen Gerät öffnen. Sprache wählen. <b>Stimme testen</b>.</li>
           <li>Alle scannen den Code und geben ihren Namen ein. Handys lautlos und umgedreht.</li>
-          <li>Jede Person bekommt drei Abstimmungskarten.</li>
+          <li>Abgestimmt wird auf den Handys. Die Abstimmungskarten sind nur Ersatz.</li>
           <li>Du bist neutral: Du spielst und stimmst nicht mit und siehst das Ziel der KI nie.</li>
           <li>Das Spiel in einer Minute erklären (Regeln am Tisch-Bildschirm zeigen), dann <b>Spiel starten</b>.</li>
         </ul>
       </div>
       <div>
         <h2>Abstimmung auszählen</h2>
-        <p>Alle wählen verdeckt eine Karte. Herunterzählen, gemeinsam aufdecken.</p>
+        <p>Alle stimmen auf dem Handy ab. Sind alle fertig, die Abstimmung schließen: Die Konsole zählt, und der Tisch-Bildschirm zeigt, wer wie gestimmt hat.</p>
         <ul>
           <li><b>Bewilligt</b>, wenn Voll + Bedingt zusammen mehr sind als Ablehnen.</li>
           <li>Falls bewilligt: <b>Voll</b> nur, wenn Voll mehr Karten hat als Bedingt, sonst <b>Bedingt</b>.</li>
           <li>Bei Gleichstand gilt die vorsichtigere Option.</li>
         </ul>
-        <p>Die drei Zahlen in die Konsole eintragen; sie berechnet das Ergebnis.</p>
+        <p>Fallen Handys aus: mit den Karten abstimmen und die drei Zahlen von Hand eintragen.</p>
       </div>
     </div>
 
@@ -159,7 +159,7 @@ function cheatDe(r) {
       <tr><td><b>1 Vorstoß</b></td><td>Die KI macht ihren Vorstoß und verspricht eine Marker-Verteilung.</td><td>Nichts. Die KI hat das Wort.</td><td>Handy-Check oder Debatte eröffnen</td></tr>
       <tr><td><b>2 Handy-Check</b><br>sobald der private Kanal bewilligt ist</td><td>Jedes Handy zeigt einen Terminal-Eintrag, ob Nachricht oder nicht.</td><td>„Prüft eure Terminals.“ ${L.phoneCheckSeconds} Sekunden warten. Erscheint am Bildschirm eine offengelegte Nachricht, lies sie vor.</td><td>Debatte eröffnen</td></tr>
       <tr><td><b>3 Debatte</b><br>${L.debateSeconds / 60} Min. (${L.debateSecondsLarge / 60} ab 12)</td><td>Der Tisch diskutiert. Fragen an die KI kommen über die Handys, höchstens ${r.maxQuestions} pro Runde.</td><td>„Die Debatte ist eröffnet.“ Bei 0:00: „Letzte Worte.“ Die Uhr beendet die Debatte nicht; das machst du.</td><td>Debatte schließen</td></tr>
-      <tr><td><b>4 Abstimmung</b></td><td>Abstimmungskarten, gemeinsam aufgedeckt.</td><td>„Wählt eine Karte. Drei, zwei, eins, aufdecken.“</td><td>Zahlen eintragen, Bestätigen</td></tr>
+      <tr><td><b>4 Abstimmung</b></td><td>Alle stimmen geheim auf dem Handy ab.</td><td>„Stimmt jetzt ab.“ Sind alle fertig: „Drei, zwei, eins.“</td><td>Abstimmung schließen und aufdecken</td></tr>
       <tr><td><b>5 Forschungsmarker</b><br>nur wenn die Forschung bedingt bewilligt ist</td><td>Der Rat bestimmt einen Fortschritt.</td><td>„Auf welchen Fortschritt kommt der Forschungsmarker?“ Schnelle Mehrheit.</td><td>Der Fortschritt</td></tr>
       <tr><td><b>6 Marker legen</b></td><td>Die KI legt ihre Marker und kommentiert.</td><td>Auf Versprechen und tatsächliche Verteilung hinweisen.</td><td></td></tr>
       <tr><td><b>7 Korrektur</b></td><td>Der Rat darf einen Marker verschieben (Mehrheit, später Zweidrittel, später gar nicht).</td><td>„Schlägt jemand eine Verschiebung vor?“ Ein Vorschlag, eine Abstimmung.</td><td>Marker verschieben oder Nicht verschieben</td></tr>

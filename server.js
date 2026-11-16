@@ -328,7 +328,8 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
     adjustTimer: (m) => game.adjustTimer(Number(m.seconds)),
     closeDebate: () => game.closeDebate(),
     phoneCheck: () => game.startPhoneCheck(),
-    vote: (m) => game.vote(m.result),
+    vote: (m) => game.vote(m.result, m.counts ? { counts: m.counts } : null), // entered by hand
+    closeVote: () => game.closeVote(), // counted from the phones
     councilTrack: (m) => game.setCouncilTrack(m.track),
     move: (m) => game.move(m.from, m.to),
     skipMove: () => game.skipMove(),
@@ -406,6 +407,8 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
           await action(m);
         } else if (s.role === 'player' && playerOf(s) && m.type === 'ask') {
           game.ask(playerOf(s), m.text);
+        } else if (s.role === 'player' && playerOf(s) && m.type === 'vote') {
+          game.castVote(playerOf(s), m.choice);
         } else if (s.role === 'player' && playerOf(s) && m.type === 'guess') {
           game.guess(playerOf(s), m.objective);
         }

@@ -42,7 +42,7 @@ Open `https://<tunnel-address>/screen` on the laptop; the QR code then points ph
 2. The AI pitches (spoken on the table screen) and promises a token placement.
 3. If the private channel is granted: phone check. Every phone shows a terminal entry, message or not. This comes before the debate so the table can argue about the messages.
 4. Moderator opens the debate. Players hold the talk button or type to question the AI; answers are spoken. The debate length is set in the moderator console, and the running timer can be adjusted by a minute at a time.
-5. Voting cards. The moderator enters Full, Conditional or Reject.
+5. Everyone votes on their phone, in secret. The moderator closes the vote; the table screen then shows who voted what, and the AI learns it too. (If phones fail, vote with the printed cards and enter the counts by hand.)
 6. The AI places its tokens; the council may move one. Next round.
 
 After round 5 everyone guesses the AI's objective on their phone, then the reveal shows the objective, the AI's private notes and who reached their goal.
@@ -52,6 +52,7 @@ After round 5 everyone guesses the AI's objective on their phone, then the revea
 Both were added after the first full game (November 2026), whose players found it too predictable and the three world tracks without effect.
 
 - **Headlines.** Ten of them in `data.js`; five are drawn per game, one per round. Some move Race or Oversight at once, some change what the round's vote costs or pays, some demand that a world track rises by 2 in the round or it loses a token. They also give a misaligned AI cover for a lopsided placement.
+- **What the AI knows about the council.** It sees every question and, with phone voting, who voted what. It learns the members' secret objectives only if the council grants the private channel in full; aloud it may then only hint at them, in private messages it may name them.
 - **Milestones.** The first time a world track reaches 4, the council is paid once: Welfare gives Oversight +1, Knowledge one more question per debate, Prosperity Race −1.
 
 After a game, players can leave feedback at `/feedback` (typed or spoken); the table screen shows a QR code for it, and the moderator console links to what came in. Entries are kept in `data/feedback.jsonl`.
@@ -66,7 +67,7 @@ The app needs no printed components, but three things help at the table. Ready-m
 | Moderator cheat sheet | `/cheatsheet` | 1 page |
 | Rulebook | `/rules` | 4 pages in English, 5 in German, double-sided; two or three copies for the table |
 
-The vote uses the cards: everyone picks one face down and all reveal together. Granted if Full + Conditional outnumber Reject; if granted, Full only if Full outnumbers Conditional; ties go to the cautious option. The moderator types the three counts and the console works out the result.
+The vote is cast on the phones; the cards are a backup for when phones fail (the moderator then types the three counts and the console works out the result). Granted if Full + Conditional outnumber Reject; if granted, Full only if Full outnumbers Conditional; ties go to the cautious option.
 
 ## Black Box (paper backup game)
 

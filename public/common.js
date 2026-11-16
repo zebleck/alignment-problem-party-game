@@ -113,6 +113,19 @@ export function placementHtml(p) {
     ${[].concat(p.moved || []).map((m) => `<p>${t('The council moved one token from {from} to {to}.', names(m))}</p>`).join('')}`;
 }
 
+// How the council voted: names under each result when the phones were used, counts if
+// the moderator typed them, nothing if only the result is known.
+export function votesHtml(v) {
+  if (!v || (!v.by && !v.counts)) return '';
+  const group = (k) => {
+    const who = v.by ? v.by.filter((x) => x.vote === k).map((x) => esc(x.name)) : [];
+    const n = v.by ? who.length : v.counts[k];
+    return `<div class="vote-group ${k}"><div class="vote-group-head c-${k}">${icon(k)}<b>${k === 'rejected' ? t('Reject') : statusName(k)}</b><span class="mono">${n}</span></div>${who.length ? `<div class="vote-names">${who.join(', ')}</div>` : ''}</div>`;
+  };
+  const silent = v.by ? v.by.filter((x) => !x.vote).map((x) => esc(x.name)) : [];
+  return `<div class="votes">${['full', 'conditional', 'rejected'].map(group).join('')}</div>${silent.length ? `<div class="muted vote-silent">${t('did not vote')}: ${silent.join(', ')}</div>` : ''}`;
+}
+
 // What the AI's promise was for: the vote it asked the council for.
 const PROMISED = { full: N('Promised for a Full grant'), conditional: N('Promised for a Conditional grant'), rejected: N('Promised if rejected') };
 export const promiseLabel = (ask) => t(PROMISED[ask] || PROMISED.full);

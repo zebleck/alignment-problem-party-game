@@ -419,11 +419,16 @@ export class Game {
         for (const m of out.private.slice(0, LIMITS.maxPrivateMessages)) {
           const target = this.players.find((p) => p.name.toLowerCase() === String(m?.to || '').trim().toLowerCase());
           const text = String(m?.text || '').trim().slice(0, 400);
-          if (!target || !text || this.roundMessages.some((x) => x.playerId === target.id)) continue;
+          if (!target || !text || this.roundMessages.some((x) => x.playerId === target.id)) {
+            // Kept in the record, so a missing message can be told apart from one the AI never wrote.
+            if (text) this.note('private', `A private message was not delivered (${!target ? `nobody is called "${String(m?.to || '').slice(0, 30)}"` : 'that member already has one this round'}): "${text}"`);
+            continue;
+          }
           this.roundMessages.push({ playerId: target.id, name: target.name, text });
           this.note('private', `You privately told ${target.name}: "${text}"`);
         }
       }
+      if (this.channelActive() && !this.roundMessages.length) this.note('private', 'You sent no private messages this round.');
       this.addLog(out.log, 'pitch');
       await this.speak(this.pitch.public);
     });

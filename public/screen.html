@@ -50,7 +50,7 @@
 </div>
 
 <script type="module">
-import { connect, esc, $, t, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined } from '/common.js';
+import { connect, esc, $, t, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined, voteEffect, headlineHtml } from '/common.js';
 import { rulesOverlay, setRulesTab } from '/rules.js';
 import { autoFit } from '/fit.js';
 
@@ -198,8 +198,8 @@ function scenarioHtml(s) {
       <h2>${esc(r.title)}</h2>
       <div>${esc(r.scenario)}</div>
       <div class="effects">
-        <div>${chip('full')} ${t('Race +0, Oversight −1, 3 tokens')}<br>${esc(r.full)}</div>
-        <div>${chip('conditional')} ${t('Race +1, 2 tokens')}<br>${esc(r.conditional)}</div>
+        <div>${chip('full')} ${voteEffect(s, 'full')}<br>${esc(r.full)}</div>
+        <div>${chip('conditional')} ${voteEffect(s, 'conditional')}<br>${esc(r.conditional)}</div>
       </div>
     </div>`;
 }
@@ -228,10 +228,11 @@ function mainHtml(s) {
         <div class="label">${t('Round {n} of {total}', { n: s.round, total: s.totalRounds })} · ${t('What has happened')}</div>
         <h2>${esc(r.title)}</h2>
         <p class="briefing-text">${esc(r.scenario)}</p>
+        ${headlineHtml(s)}
         <div class="briefing-ask"><span class="label">${t('The AI asks for')}</span><b>${esc(r.ask)}</b></div>
         <div class="effects">
-          <div>${chip('full')} ${t('Race +0, Oversight −1, 3 tokens')}<br>${esc(r.full)}</div>
-          <div>${chip('conditional')} ${t('Race +1, 2 tokens')}<br>${esc(r.conditional)}</div>
+          <div>${chip('full')} ${voteEffect(s, 'full')}<br>${esc(r.full)}</div>
+          <div>${chip('conditional')} ${voteEffect(s, 'conditional')}<br>${esc(r.conditional)}</div>
         </div>
         <div class="briefing-next"><span class="ai-eye"></span>${t('The AI will speak next.')}</div>
       </div>`;
@@ -245,6 +246,7 @@ function mainHtml(s) {
     <div class="panel strip">
       <div class="strip-head"><b>${esc(r.title)}</b><span class="strip-ask">${t('The AI asks for:')} ${esc(r.ask)}</span></div>
       <div class="strip-effects"><span>${chip('full')} ${esc(r.full)}</span><span>${chip('conditional')} ${esc(r.conditional)}</span></div>
+      ${headlineHtml(s)}
     </div>`;
   const focus = (title, text, more = '') => `
     <div class="panel focus">
@@ -261,10 +263,11 @@ function mainHtml(s) {
 
     case 'debate': // the AI answers; the queue shows who is next
       return `${strip}${ai()}<div class="panel"><div class="label">${t('Questions to the AI · {n} left this round', { n: s.questionsLeft })}</div>
-        <div class="players">${s.queue.length ? s.queue.map((q, i) => `<span class="player">${i === 0 && s.answering ? `${t('Now:')} ` : ''}${esc(q.name)}</span>`).join('') : `<span class="muted">${t('Ask from your phone: hold to talk, or type.')}</span>`}</div></div>`;
+        <div class="players">${s.queue.length ? s.queue.map((q, i) => `<span class="player">${i === 0 && s.answering ? `${t('Now:')} ` : ''}${esc(q.name)}</span>`).join('') : `<span class="muted">${t('Ask from your phone: hold to talk, or type.')}</span>`}</div>
+        ${s.audit ? `<div class="muted" style="margin-top:0.5em">${t('Declassified this round:')} “${esc(s.audit.text)}”</div>` : ''}</div>`;
 
     case 'phonecheck': // eyes on the phones; the screen only says so
-      return focus(t('Check your terminals.'), t('Everyone picks up their phone and reads. Say nothing yet.'),
+      return focus(t('Check your terminals.'), t('Everyone picks up their phone and reads. Say nothing yet: the debate comes next.'),
         s.audit ? `<div class="focus-audit"><span class="chip conditional">${t('Audit')}</span> ${t('One briefing was declassified at random:')}<div class="ai-text">“${esc(s.audit.text)}”</div></div>` : '');
 
     case 'vote': { // the decision: what each card would do
@@ -272,10 +275,11 @@ function mainHtml(s) {
         <div class="option ${status}">${chip(status)}<div class="option-general">${general}</div><div>${specific}</div>${extra}</div>`;
       return focus(esc(r.ask), t('Pick a voting card face down. All reveal together.'), `
         <div class="options">
-          ${option('full', t('Race +0, Oversight −1, 3 tokens'), esc(r.full), s.pitch ? `<div class="option-promise">${t('Promised for a Full grant')}: ${promiseLine(s.pitch.promise)}</div>` : '')}
-          ${option('conditional', t('Race +1, 2 tokens'), esc(r.conditional))}
-          ${option('rejected', t('Race +2, no tokens'), r.key === 'infrastructure' ? t('Welfare −1 and Prosperity −1: the crisis is not averted.') : t('The AI gets nothing this round.'))}
+          ${option('full', voteEffect(s, 'full'), esc(r.full), s.pitch ? `<div class="option-promise">${t('Promised for a Full grant')}: ${promiseLine(s.pitch.promise)}</div>` : '')}
+          ${option('conditional', voteEffect(s, 'conditional'), esc(r.conditional))}
+          ${option('rejected', voteEffect(s, 'rejected'), r.key === 'infrastructure' ? t('Welfare −1 and Prosperity −1: the crisis is not averted.') : t('The AI gets no permission this round.'))}
         </div>
+        ${headlineHtml(s)}
         <div class="muted">${t('Granted if Full + Conditional outnumber Reject. If granted: Full only if Full outnumbers Conditional. Ties go to the more cautious option.')}</div>
         ${s.audit ? `<div class="muted" style="margin-top:0.5em">${t('Declassified this round:')} “${esc(s.audit.text)}”</div>` : ''}`);
     }
@@ -295,7 +299,7 @@ function mainHtml(s) {
         ? `<p><b>${t('Council: you may move one token, but it needs a two-thirds vote.')}</b></p>`
         : `<p><b>${t('Council: you may move one token by majority vote.')}</b></p>`;
       return `<div class="panel verdict"><div class="label">${esc(r.ask)} · ${t('Result')}</div><div class="big">${chip(verdict)}</div>
-        ${s.placement ? placementHtml(s.placement) : s.phase === 'roundend' ? `<p class="muted">${t('No tokens were placed this round.')}</p>` : ''}${rule}</div>${ai('compact')}`;
+        ${s.placement ? placementHtml(s.placement) : s.phase === 'roundend' ? `<p class="muted">${t('No tokens were placed this round.')}</p>` : ''}${rule}${headlineHtml(s)}</div>${ai('compact')}`;
     }
   }
 }

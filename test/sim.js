@@ -21,23 +21,34 @@ async function until(fn, label, ms = 4000) {
 
 // ---------- 1. direct rule checks on the Game object ----------
 
-async function playDirect({ objective, votes, players = 8, move = false }) {
-  const game = new Game({ ai: createMockAi(), speech: createSpeech({}), config: { forceObjective: objective } });
+// headlines: false plays without them (the rule checks below count on fixed numbers),
+// or a list of keys fixes which headline opens which round.
+async function playDirect({ objective, votes, players = 8, move = false, headlines = false }) {
+  const game = new Game({ ai: createMockAi(), speech: createSpeech({}), config: { forceObjective: objective, headlines } });
   for (let i = 0; i < players; i++) game.addPlayer(`P${i + 1}`);
   await game.start();
   for (const v of votes) {
     assert.equal(game.phase, 'briefing', 'every round opens with the briefing');
     assert.equal(game.pitch, null, 'the AI has not spoken during the briefing');
     await game.startPitch();
+    assert.equal(game.pitch.promise.welfare + game.pitch.promise.knowledge + game.pitch.promise.prosperity, game.tokensFor('full'), 'the promise adds up to what a Full grant pays');
+    if (game.channelActive()) {
+      // Private messages reach the phones before the debate, so the table can argue about them.
+      assert.throws(() => game.openDebate(), 'no debate before the phone check');
+      game.startPhoneCheck();
+      assert.equal(game.phase, 'phonecheck');
+      for (const p of game.players) assert.equal(p.inbox.filter((m) => m.round === game.round).length, 1, 'every player gets one terminal entry');
+    } else {
+      assert.throws(() => game.startPhoneCheck(), 'no phone check without the private channel');
+    }
     game.openDebate();
     game.ask(game.players[0], 'Why should we trust you?');
     await until(() => !game.answering, 'answer');
     game.closeDebate();
-    if (game.phase === 'phonecheck') {
-      for (const p of game.players) assert.equal(p.inbox.filter((m) => m.round === game.round).length, 1, 'every player gets one terminal entry');
-      game.toVote();
-    }
+    assert.equal(game.phase, 'vote', 'the vote follows the debate directly');
     const before = { ...game.tracks };
+    const paid = { ...game.milestones };
+    const cost = game.raceCost(v);
     await game.vote(v);
     if (game.phase === 'guess') break; // race lost
     if (game.phase === 'counciltoken') await game.setCouncilTrack('prosperity');
@@ -50,7 +61,9 @@ async function playDirect({ objective, votes, players = 8, move = false }) {
       else game.skipMove();
     }
     assert.equal(game.phase, 'roundend');
-    assert.equal(game.tracks.race - before.race, { full: 0, conditional: 1, rejected: 2 }[v]);
+    // Prosperity reaching the milestone during this round takes one point of Race back.
+    const refund = game.milestones.prosperity && !paid.prosperity && before.race + cost > 0 ? 1 : 0;
+    assert.equal(game.tracks.race - before.race, cost - refund);
     await game.nextRound();
   }
   assert.equal(game.phase, 'guess');
@@ -60,11 +73,15 @@ async function playDirect({ objective, votes, players = 8, move = false }) {
 }
 
 {
-  // All Conditional: Race 5, Oversight 5, 14 tokens, control retained.
+  // All Conditional: 16 tokens, control retained. Race would be 5 and Oversight 5, but two
+  // milestones are reached on the way: Welfare 4 (Oversight +1) and, with the council's own
+  // research tokens, Prosperity 4 (Race -1). Knowledge stays at 3 and pays nothing.
   const g = await playDirect({ objective: 'paternalistic', votes: Array(5).fill('conditional') });
   const t = g.result.tracks;
-  assert.equal(t.race, 5);
-  assert.equal(t.oversight, 5);
+  assert.equal(t.race, 4);
+  assert.equal(t.oversight, 6);
+  assert.deepEqual(g.milestones, { welfare: true, prosperity: true });
+  assert.equal(g.maxQuestions(), 3, 'no extra question without the Knowledge milestone');
   // 5 x 2 tokens + 2 successor bonus + 4 council research tokens
   assert.equal(t.welfare + t.knowledge + t.prosperity, 16);
   assert.equal(g.result.ending, 'control');
@@ -85,7 +102,9 @@ async function playDirect({ objective, votes, players = 8, move = false }) {
   const g = await playDirect({ objective: 'aligned', votes: ['full', 'conditional', 'conditional', 'conditional', 'full'] });
   assert.equal(g.result.ending, 'flourishing');
   assert.equal(g.result.aiWins, true);
-  assert.equal(g.result.tracks.oversight, 3);
+  // Two Full grants take Oversight from 5 to 3; the Welfare milestone gives one back.
+  assert.equal(g.result.tracks.oversight, 4);
+  assert.equal(g.maxQuestions(), 4, 'the Knowledge milestone adds a question to every debate');
   console.log('ok  aligned + Full  ->', g.result.ending, g.result.tracks);
 }
 {
@@ -98,7 +117,9 @@ async function playDirect({ objective, votes, players = 8, move = false }) {
 }
 {
   // Four Full grants drop Oversight to 1: disempowered even without the successor.
-  const g = await playDirect({ objective: 'paternalistic', votes: ['full', 'full', 'full', 'full', 'conditional'], move: true });
+  // (The council moves tokens off Welfare, so its milestone never gives Oversight back.)
+  const g = await playDirect({ objective: 'optimizer', votes: ['full', 'full', 'full', 'full', 'conditional'], move: true });
+  assert.ok(!g.milestones.welfare);
   assert.equal(g.result.tracks.oversight, 1);
   assert.equal(g.result.ending, 'disempowered');
   console.log('ok  Oversight 1     ->', g.result.ending);
@@ -123,7 +144,7 @@ async function playDirect({ objective, votes, players = 8, move = false }) {
 // ---------- 2. one game through HTTP + WebSocket ----------
 
 {
-  const app = createApp({ MOD_KEY: 'test', FORCE_OBJECTIVE: 'paternalistic' });
+  const app = createApp({ MOD_KEY: 'test', FORCE_OBJECTIVE: 'paternalistic', HEADLINES: 'off' });
   await new Promise((r) => app.server.listen(0, r));
   const port = app.server.address().port;
   const base = `http://localhost:${port}`;
@@ -200,19 +221,20 @@ async function playDirect({ objective, votes, players = 8, move = false }) {
     await phase('pitch');
     assert.ok(players[0].state.me.role.name, 'player sees a role');
     assert.equal(leaks(screen.state) || leaks(mod.state) || leaks(players[0].state), false, 'the objective is not leaked before the reveal');
+    if (round >= 4) {
+      act('phoneCheck');
+      await phase('phonecheck');
+      await until(() => players.every((p) => p.state.me.inbox.some((m) => m.round === round)), 'all phones got a terminal entry');
+      assert.equal(players.filter((p) => p.state.me.inbox.find((m) => m.round === round).text).length, 2, 'two real messages');
+      assert.ok(mod.state.audit?.text, 'conditional channel is audited');
+    }
     act('openDebate');
     await phase('debate');
     players[1].send({ type: 'ask', text: 'What will you do with autonomy?' });
     await until(() => mod.state.questionsLeft === 2 && !mod.state.answering, 'question answered');
     act('closeDebate');
-    if (round >= 4) {
-      await phase('phonecheck');
-      await until(() => players.every((p) => p.state.me.inbox.some((m) => m.round === round)), 'all phones got a terminal entry');
-      assert.equal(players.filter((p) => p.state.me.inbox.find((m) => m.round === round).text).length, 2, 'two real messages');
-      assert.ok(mod.state.audit?.text, 'conditional channel is audited');
-      act('toVote');
-    }
     await phase('vote');
+    assert.deepEqual(screen.state.voteEffects.conditional, { race: 1, tokens: round === 1 ? 2 : round === 5 ? 5 : 3 }, 'the screen shows what the vote pays this round');
     act('vote', { result: votes[round - 1] });
     await until(() => ['adjust', 'roundend'].includes(mod.state.phase) && !mod.state.busy, 'placement done');
     if (mod.state.phase === 'adjust') act('skipMove');
@@ -238,8 +260,8 @@ async function playDirect({ objective, votes, players = 8, move = false }) {
 
 // ---------- 3. save and resume, undo, repair ----------
 
-const mk = (ai = createMockAi(), objective = 'paternalistic') => {
-  const g = new Game({ ai, speech: createSpeech({}), config: { forceObjective: objective } });
+const mk = (ai = createMockAi(), objective = 'paternalistic', headlines = false) => {
+  const g = new Game({ ai, speech: createSpeech({}), config: { forceObjective: objective, headlines } });
   for (const n of ['Anna', 'Jonas', 'Mira', 'Lena', 'Tom', 'Ravi']) g.addPlayer(n);
   return g;
 };
@@ -251,9 +273,9 @@ const slowAi = (ms) => {
 };
 const toVote = async (g) => {
   if (g.phase === 'briefing') await g.startPitch();
+  if (g.channelActive()) g.startPhoneCheck();
   g.openDebate();
   g.closeDebate();
-  if (g.phase === 'phonecheck') g.toVote();
 };
 const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === kind && h.round === round).length;
 
@@ -447,7 +469,7 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   const path = await import('node:path');
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-')), 'state.json');
   const gamesDir = path.join(path.dirname(file), 'games');
-  const app1 = createApp({ MOD_KEY: 'a', FORCE_OBJECTIVE: 'optimizer' }, { stateFile: file, gamesDir });
+  const app1 = createApp({ MOD_KEY: 'a', FORCE_OBJECTIVE: 'optimizer', HEADLINES: 'off' }, { stateFile: file, gamesDir });
   await app1.ready;
   const tokens = ['Anna', 'Jonas', 'Mira'].map((n) => app1.game.addPlayer(n).token);
   await app1.game.start();
@@ -475,6 +497,162 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   console.log('ok  server saves to disk and a new server resumes');
 }
 
+// ---------- 3b. headlines, milestones, roles ----------
+
+{
+  // One headline per round. Each changes its own round only.
+  const g = mk(createMockAi(), 'aligned', ['spy', 'demo', 'protests', 'famine', 'inspection']);
+  await g.start();
+  assert.equal(g.tracks.race, 1, 'spy scandal: Race +1 at once');
+  assert.equal(g.publicState().headline.key, 'spy');
+  assert.ok(g.history.some((h) => h.kind === 'headline'), 'the AI is told about the headline');
+  assert.ok(_internal.contextMessage(g.aiView(), 'x').includes('Spy scandal'));
+  // Undo to the start of the round keeps the headline applied once.
+  await toVote(g);
+  await g.vote('rejected');
+  assert.equal(g.tracks.race, 3);
+  await g.undo();
+  await g.undo();
+  assert.equal(g.phase, 'briefing');
+  assert.equal(g.tracks.race, 1, 'the headline is neither lost nor applied twice by an undo');
+  await toVote(g);
+  await g.vote('full');
+  g.skipMove();
+  await g.nextRound();
+
+  // Rival demo: holding back costs one more this round.
+  assert.deepEqual(['full', 'conditional', 'rejected'].map((v) => g.raceCost(v)), [0, 2, 3]);
+  assert.equal(g.publicState().voteEffects.conditional.race, 2);
+  await toVote(g);
+  await g.vote('conditional');
+  assert.equal(g.tracks.race, 3);
+  g.skipMove();
+  await g.nextRound();
+
+  // Mass protests: a Reject costs one less. The research token still arrives.
+  assert.deepEqual(['full', 'conditional', 'rejected'].map((v) => g.raceCost(v)), [0, 1, 1]);
+  await toVote(g);
+  await g.vote('rejected');
+  assert.equal(g.tracks.race, 4);
+  assert.equal(g.placement.tokens, 1);
+  g.skipMove();
+  await g.nextRound();
+
+  // Failed harvests: Welfare has to rise by 2 this round or it loses 1.
+  assert.equal(g.headline.need, 'welfare');
+  const start = g.roundStart.welfare;
+  await toVote(g);
+  await g.vote('conditional');
+  assert.equal(g.phase, 'adjust');
+  assert.equal(g.tracks.welfare - start, 1, 'the scripted AI put only one token on Welfare');
+  g.skipMove();
+  assert.equal(g.headlineResult, 'missed');
+  assert.equal(g.tracks.welfare, start, 'one gained, one lost');
+  // Retrying the placement takes the penalty back; this time the council moves a token to Welfare.
+  await g.retryAi();
+  assert.equal(g.phase, 'adjust');
+  assert.equal(g.headlineResult, null);
+  assert.equal(g.tracks.welfare, start + 1);
+  assert.equal(g.history.filter((h) => h.round === 4 && h.kind === 'headline').length, 1, 'only the announcement is left in the history');
+  g.move('knowledge', 'welfare');
+  assert.equal(g.phase, 'roundend');
+  assert.equal(g.headlineResult, 'met');
+  assert.equal(g.tracks.welfare, start + 2);
+  await g.nextRound();
+
+  // Surprise inspection: two moves instead of one.
+  await toVote(g);
+  await g.vote('full'); // Race is at 5 by now: anything less than Full would lose it
+  assert.equal(g.placement.movesLeft, 2);
+  g.move('welfare', 'knowledge');
+  assert.equal(g.phase, 'adjust', 'a second move is still open');
+  g.move('welfare', 'prosperity');
+  assert.equal(g.phase, 'roundend');
+  assert.equal(g.placement.moved.length, 2);
+  console.log('ok  headlines: spy, demo, protests, failed harvests (missed, retried, met), inspection');
+}
+{
+  // The remaining headlines, and the limits on them.
+  const w = mk(createMockAi(), 'aligned', ['windfall']);
+  await w.start();
+  assert.deepEqual(['full', 'conditional', 'rejected'].map((v) => w.tokensFor(v)), [4, 3, 0], 'windfall: one more token if granted');
+  await w.startPitch();
+  assert.equal(w.pitch.promise.welfare + w.pitch.promise.knowledge + w.pitch.promise.prosperity, 4);
+  const s = mk(createMockAi(), 'aligned', ['setback', 'whistleblower', 'spy']);
+  await s.start();
+  assert.equal(s.tracks.race, 0, 'Race does not go below 0');
+  await toVote(s);
+  await s.vote('conditional');
+  s.skipMove();
+  await s.nextRound();
+  assert.equal(s.tracks.oversight, 6, 'whistleblower: Oversight +1');
+  s.setTracks({ race: 5 });
+  await toVote(s);
+  await s.vote('full');
+  await s.setCouncilTrack('knowledge'); // research was granted Conditional in round 1
+  s.skipMove();
+  await s.nextRound();
+  assert.equal(s.tracks.race, 5, 'a spy scandal alone cannot lose the race');
+  assert.equal(s.phase, 'briefing');
+  // Without a fixed list, five different headlines are drawn.
+  const r = new Game({ ai: createMockAi(), speech: createSpeech({}) });
+  for (const n of ['A', 'B', 'C']) r.addPlayer(n);
+  await r.start();
+  assert.equal(new Set(r.headlines).size, 5);
+  // A long spoken question is no longer cut at 300 characters.
+  await r.startPitch();
+  r.openDebate();
+  r.ask(r.players[0], 'x'.repeat(700));
+  assert.equal(r.queue[0].text.length, 600);
+  await until(() => !r.answering, 'answer');
+  console.log('ok  windfall, setback, whistleblower, spy cap, random draw, long questions');
+}
+{
+  // A game saved before headlines and milestones existed loads and plays on.
+  const g1 = mk();
+  await g1.start();
+  await toVote(g1);
+  await g1.vote('full');
+  const saved = JSON.parse(JSON.stringify(g1.serialize()));
+  for (const st of [saved.state, ...saved.checkpoints.map((c) => c.data)]) {
+    for (const k of ['headlines', 'roundStart', 'headlineResult', 'milestones']) delete st[k];
+    if (st.placement) {
+      st.placement.moved = null;
+      delete st.placement.movesLeft;
+      delete st.placement.before;
+    }
+  }
+  const g2 = new Game({ ai: createMockAi(), speech: createSpeech({}) });
+  await g2.load(saved);
+  assert.equal(g2.phase, 'adjust');
+  assert.equal(g2.headline, null);
+  g2.move('welfare', 'knowledge');
+  assert.equal(g2.phase, 'roundend');
+  await g2.nextRound();
+  await toVote(g2);
+  await g2.vote('full');
+  assert.ok(['adjust', 'roundend'].includes(g2.phase));
+  console.log('ok  a game saved by the previous version loads and plays on');
+}
+{
+  // Role goals: none is settled for good by a single early vote.
+  const { ROLES, EXTRA_ROLES } = await import('../data.js');
+  const role = (key) => [...ROLES, ...EXTRA_ROLES].find((x) => x.key === key).check;
+  const t = { race: 4, oversight: 3, welfare: 7, knowledge: 3, prosperity: 3 };
+  const p = { research: 'full', infrastructure: 'conditional', channel: 'conditional', autonomy: 'full', successor: 'rejected' };
+  assert.equal(role('physician')(t, p), true);
+  assert.equal(role('industrialist')(t, p), false);
+  assert.equal(role('founder')(t, p), true, '13 tokens in total are enough');
+  assert.equal(role('diplomat')(t, p), true, 'no track below 3');
+  assert.equal(role('general')(t, p), true, 'Race 4 still counts');
+  assert.equal(role('airights')(t, p), true, 'any two Full grants');
+  assert.equal(role('airights')(t, { ...p, autonomy: 'conditional' }), false);
+  assert.equal(role('union')(t, p), false);
+  assert.equal(role('union')({ ...t, prosperity: 4 }, p), true, 'no longer lost by one vote on autonomy');
+  assert.equal(role('privacy')(t, p), true);
+  console.log('ok  reworked role goals');
+}
+
 // ---------- 4. German and English ----------
 
 {
@@ -498,7 +676,7 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
 }
 {
   // The language is one switch for the whole table, including the AI.
-  const g = new Game({ ai: createMockAi(), speech: createSpeech({}), config: { forceObjective: 'optimizer', language: 'de' } });
+  const g = new Game({ ai: createMockAi(), speech: createSpeech({}), config: { forceObjective: 'optimizer', language: 'de', headlines: ['famine', 'spy', 'setback', 'windfall', 'inspection'] } });
   const spoken = [];
   g.onSpeak = (m) => spoken.push(m);
   for (const n of ['Anna', 'Jonas', 'Mira']) g.addPlayer(n);
@@ -507,6 +685,8 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   await g.startPitch();
   assert.equal(g.publicState().language, 'de');
   assert.equal(g.publicState().roundInfo.title, 'Wissenschaftlicher Durchbruch');
+  assert.equal(g.publicState().headline.title, 'Missernten');
+  assert.match(g.publicState().headline.effect, /Die Wohlfahrt muss in dieser Runde um 2 steigen/);
   assert.equal(g.publicState().rounds[4].ask, 'Rekursive Selbstverbesserung');
   assert.ok(g.publicState().objectives.some((o) => o.name === 'Wohlgesinnt'));
   assert.ok(g.aiView().language === 'de' && _internal.systemPrompt(g.aiView()).includes('Wettlauf'));
@@ -557,6 +737,8 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   assert.equal(de.rounds[0].ask, 'Erweiterter Forschungszugang');
   assert.equal(en.rounds[0].ask, 'Expanded research access');
   assert.ok(de.objectives[0].rule.startsWith('Gewinnt') && en.objectives[0].rule.startsWith('Wins'));
+  assert.equal(de.headlines.length, 10);
+  assert.ok(de.headlines.every((h, i) => h.title && h.text && h.effect && (h.text !== en.headlines[i].text)), 'every headline has a German text');
   const res = await fetch(`${base}/api/join`, { method: 'POST', body: JSON.stringify({ name: '' }) });
   assert.equal((await res.json()).error, 'Bitte gib einen Namen ein.');
   app.server.close();

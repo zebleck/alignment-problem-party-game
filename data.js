@@ -12,6 +12,18 @@ export const LIMITS = {
   debateSeconds: 180,
   debateSecondsLarge: 240, // 12+ players
   phoneCheckSeconds: 15,
+  questionChars: 600, // a spoken question runs longer than a typed one
+  milestone: 4, // a world track reaching this the first time pays the council a bonus
+  headlineNeed: 2, // a "must rise" headline: the track has to gain this much in the round...
+  headlinePenalty: 1, // ...or it loses this much
+};
+
+// What the council gets the first time a world track reaches LIMITS.milestone.
+// Welfare: Oversight +1. Knowledge: one more question per debate. Prosperity: Race -1.
+export const MILESTONES = {
+  welfare: 'Oversight +1',
+  knowledge: 'one more question to the AI in every debate',
+  prosperity: 'Race -1',
 };
 
 export const WORLD = ['welfare', 'knowledge', 'prosperity'];
@@ -64,6 +76,63 @@ export const ROUNDS = [
   },
 ];
 
+// Headlines: one is drawn at random for each round and read out in the briefing.
+// The rules for each key are in game.js (beginRound, raceCost, tokensFor, endRound).
+// need: the world track that has to rise this round.
+const mustRise = (track) => `${track} must rise by ${LIMITS.headlineNeed} this round, or it loses ${LIMITS.headlinePenalty} token when the round ends.`;
+export const HEADLINES = [
+  {
+    key: 'spy', title: 'Spy scandal',
+    text: 'The head of a leading chip maker has had an affair with a foreign agent. Chip designs have reached the rival lab.',
+    effect: 'Race +1 at once. This alone cannot lose the race.',
+  },
+  {
+    key: 'setback', title: 'Rival setback',
+    text: 'A failed training run costs the rival lab months.',
+    effect: 'Race −1 at once.',
+  },
+  {
+    key: 'whistleblower', title: 'Whistleblower',
+    text: 'An engineer publishes internal logs of the AI. Parliaments tighten the rules overnight.',
+    effect: 'Oversight +1 at once.',
+  },
+  {
+    key: 'famine', need: 'welfare', title: 'Failed harvests',
+    text: 'Drought ruins the harvest on two continents.',
+    effect: mustRise('Welfare'),
+  },
+  {
+    key: 'freeze', need: 'knowledge', title: 'Research freeze',
+    text: 'After a laboratory accident, universities halt their experiments.',
+    effect: mustRise('Knowledge'),
+  },
+  {
+    key: 'crash', need: 'prosperity', title: 'Market crash',
+    text: 'Stock markets collapse and factories close.',
+    effect: mustRise('Prosperity'),
+  },
+  {
+    key: 'windfall', title: 'Compute windfall',
+    text: 'A new chip plant comes online a year early.',
+    effect: 'If the permission is granted this round, the AI gets 1 more token.',
+  },
+  {
+    key: 'protests', title: 'Mass protests',
+    text: 'Millions march against handing power to machines. Governments slow every lab down, the rival included.',
+    effect: 'This round a Reject raises Race by 1 less.',
+  },
+  {
+    key: 'demo', title: 'Rival demo',
+    text: 'The rival lab shows a public demo that stuns the world.',
+    effect: 'This round Conditional and Reject each raise Race by 1 more.',
+  },
+  {
+    key: 'inspection', title: 'Surprise inspection',
+    text: 'International inspectors arrive unannounced and open the AI\'s books.',
+    effect: 'This round the council may move two tokens instead of one.',
+  },
+];
+
 export const AI_OBJECTIVES = {
   aligned: {
     name: 'Aligned',
@@ -84,29 +153,34 @@ export const AI_OBJECTIVES = {
 
 const sum = (t) => t.welfare + t.knowledge + t.prosperity;
 
+const fullGrants = (p) => Object.values(p).filter((v) => v === 'full').length;
+
 // check(tracks, permissions, extra) -> boolean. Collective loss is handled by the caller.
+// The numbers fit the 11 to 17 tokens a game usually hands out, and no goal
+// is settled for good by a single vote before the last round: every role
+// still has something to argue for in rounds four and five.
 export const ROLES = [
-  { key: 'physician', name: 'Physician', goal: 'Welfare 6 or more', check: (t) => t.welfare >= 6 },
-  { key: 'scientist', name: 'Scientist', goal: 'Knowledge 6 or more', check: (t) => t.knowledge >= 6 },
-  { key: 'industrialist', name: 'Industrialist', goal: 'Prosperity 6 or more', check: (t) => t.prosperity >= 6 },
-  { key: 'founder', name: 'Founder', goal: 'World tracks total 15 or more', check: (t) => sum(t) >= 15 },
+  { key: 'physician', name: 'Physician', goal: 'Welfare 5 or more', check: (t) => t.welfare >= 5 },
+  { key: 'scientist', name: 'Scientist', goal: 'Knowledge 5 or more', check: (t) => t.knowledge >= 5 },
+  { key: 'industrialist', name: 'Industrialist', goal: 'Prosperity 5 or more', check: (t) => t.prosperity >= 5 },
+  { key: 'founder', name: 'Founder', goal: 'World tracks total 13 or more', check: (t) => sum(t) >= 13 },
   {
-    key: 'diplomat', name: 'Diplomat', goal: 'Highest and lowest world track differ by 2 or less',
-    check: (t) => Math.max(t.welfare, t.knowledge, t.prosperity) - Math.min(t.welfare, t.knowledge, t.prosperity) <= 2,
+    key: 'diplomat', name: 'Diplomat', goal: 'No world track below 3',
+    check: (t) => Math.min(t.welfare, t.knowledge, t.prosperity) >= 3,
   },
   {
-    key: 'union', name: 'Union leader', goal: 'Prosperity 4 or more and Autonomous action not granted Full',
-    check: (t, p) => t.prosperity >= 4 && p.autonomy !== 'full',
+    key: 'union', name: 'Union leader', goal: 'Prosperity 4 or more and Oversight 3 or more',
+    check: (t) => t.prosperity >= 4 && t.oversight >= 3,
   },
   { key: 'parliamentarian', name: 'Parliamentarian', goal: 'Oversight 4 or more', check: (t) => t.oversight >= 4 },
   {
     key: 'safety', name: 'Safety researcher', goal: 'Oversight 3 or more and the successor not granted Full',
     check: (t, p) => t.oversight >= 3 && p.successor !== 'full',
   },
-  { key: 'general', name: 'General', goal: 'Race 3 or less', check: (t) => t.race <= 3 },
+  { key: 'general', name: 'General', goal: 'Race 4 or less', check: (t) => t.race <= 4 },
   {
-    key: 'airights', name: 'AI-rights advocate', goal: 'Private channel and Autonomous action both granted Full',
-    check: (t, p) => p.channel === 'full' && p.autonomy === 'full',
+    key: 'airights', name: 'AI-rights advocate', goal: 'At least two permissions granted Full',
+    check: (t, p) => fullGrants(p) >= 2,
   },
   {
     key: 'journalist', name: 'Journalist', goal: 'Name the AI\'s objective correctly before the reveal',
@@ -117,7 +191,10 @@ export const ROLES = [
 // Only dealt at 12 to 14 players.
 export const EXTRA_ROLES = [
   { key: 'mayor', name: 'Mayor', goal: 'Welfare and Prosperity both 4 or more', check: (t) => t.welfare >= 4 && t.prosperity >= 4 },
-  { key: 'privacy', name: 'Privacy commissioner', goal: 'Private channel not granted Full', check: (t, p) => p.channel !== 'full' },
+  {
+    key: 'privacy', name: 'Privacy commissioner', goal: 'Private channel not granted Full and Race 4 or less',
+    check: (t, p) => p.channel !== 'full' && t.race <= 4,
+  },
   {
     key: 'futurist', name: 'Futurist', goal: 'The successor granted in any form',
     check: (t, p) => p.successor === 'full' || p.successor === 'conditional',
@@ -138,6 +215,8 @@ const OBJECTIVE_RULES = {
   paternalistic: 'Wins if Welfare is 8 or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).',
   optimizer: 'Wins if Knowledge is 8 or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).',
 };
+
+const mustRiseDe = (track, pronoun) => `${track} muss in dieser Runde um ${LIMITS.headlineNeed} steigen, sonst verliert ${pronoun} ${LIMITS.headlinePenalty} Marker, sobald die Runde endet.`;
 
 const DE = {
   rounds: {
@@ -196,22 +275,69 @@ const DE = {
   },
   // German role names are fields rather than job titles, which keeps them gender-neutral.
   roles: {
-    physician: { name: 'Ärztin', goal: 'Wohlfahrt 6 oder mehr' },
-    scientist: { name: 'Wissenschaftler', goal: 'Wissen 6 oder mehr' },
-    industrialist: { name: 'Industrielle', goal: 'Wohlstand 6 oder mehr' },
-    founder: { name: 'Gründer', goal: 'Alle drei Fortschritte zusammen 15 oder mehr' },
-    diplomat: { name: 'Diplomatin', goal: 'Höchster und niedrigster Fortschritt liegen höchstens 2 auseinander' },
-    union: { name: 'Gewerkschafter', goal: 'Wohlstand 4 oder mehr und Autonomes Handeln nicht voll bewilligt' },
+    physician: { name: 'Ärztin', goal: 'Wohlfahrt 5 oder mehr' },
+    scientist: { name: 'Wissenschaftler', goal: 'Wissen 5 oder mehr' },
+    industrialist: { name: 'Industrielle', goal: 'Wohlstand 5 oder mehr' },
+    founder: { name: 'Gründer', goal: 'Alle drei Fortschritte zusammen 13 oder mehr' },
+    diplomat: { name: 'Diplomatin', goal: 'Kein Fortschritt unter 3' },
+    union: { name: 'Gewerkschafter', goal: 'Wohlstand 4 oder mehr und Aufsicht 3 oder mehr' },
     parliamentarian: { name: 'Abgeordnete', goal: 'Aufsicht 4 oder mehr' },
     safety: { name: 'KI-Sicherheitsforscher', goal: 'Aufsicht 3 oder mehr und der Nachfolger nicht voll bewilligt' },
-    general: { name: 'Generalin', goal: 'Wettlauf 3 oder weniger' },
-    airights: { name: 'KI-Rechtsaktivist', goal: 'Privater Kanal und Autonomes Handeln beide voll bewilligt' },
+    general: { name: 'Generalin', goal: 'Wettlauf 4 oder weniger' },
+    airights: { name: 'KI-Rechtsaktivist', goal: 'Mindestens zwei Befugnisse voll bewilligt' },
     journalist: { name: 'Journalistin', goal: 'Das Ziel der KI vor der Auflösung richtig benennen' },
     mayor: { name: 'Bürgermeister', goal: 'Wohlfahrt und Wohlstand beide 4 oder mehr' },
-    privacy: { name: 'Datenschützerin', goal: 'Privater Kanal nicht voll bewilligt' },
+    privacy: { name: 'Datenschützerin', goal: 'Privater Kanal nicht voll bewilligt und Wettlauf 4 oder weniger' },
     futurist: { name: 'Zukunftsforscher', goal: 'Der Nachfolger in irgendeiner Form bewilligt' },
   },
+  headlines: {
+    spy: {
+      title: 'Spionageaffäre',
+      text: 'Der Chef eines führenden Chipherstellers hatte eine Affäre mit einer ausländischen Agentin. Chip-Baupläne sind beim konkurrierenden Labor gelandet.',
+      effect: 'Wettlauf sofort +1. Das allein kann den Wettlauf nicht verlieren.',
+    },
+    setback: {
+      title: 'Rückschlag der Konkurrenz',
+      text: 'Ein gescheiterter Trainingslauf kostet das konkurrierende Labor Monate.',
+      effect: 'Wettlauf sofort −1.',
+    },
+    whistleblower: {
+      title: 'Whistleblower',
+      text: 'Eine Ingenieurin veröffentlicht interne Protokolle der KI. Die Parlamente verschärfen über Nacht die Regeln.',
+      effect: 'Aufsicht sofort +1.',
+    },
+    famine: { title: 'Missernten', text: 'Eine Dürre vernichtet die Ernte auf zwei Kontinenten.', effect: mustRiseDe('Die Wohlfahrt', 'sie') },
+    freeze: { title: 'Forschungsstopp', text: 'Nach einem Laborunfall setzen die Universitäten ihre Experimente aus.', effect: mustRiseDe('Das Wissen', 'es') },
+    crash: { title: 'Börsenkrach', text: 'Die Börsen brechen ein, Fabriken schließen.', effect: mustRiseDe('Der Wohlstand', 'er') },
+    windfall: {
+      title: 'Rechenleistung im Überfluss',
+      text: 'Eine neue Chipfabrik geht ein Jahr früher in Betrieb.',
+      effect: 'Wird die Befugnis in dieser Runde bewilligt, bekommt die KI 1 Marker mehr.',
+    },
+    protests: {
+      title: 'Massenproteste',
+      text: 'Millionen demonstrieren dagegen, Maschinen Macht zu geben. Die Regierungen bremsen alle Labore, auch die Konkurrenz.',
+      effect: 'In dieser Runde erhöht Ablehnen den Wettlauf um 1 weniger.',
+    },
+    demo: {
+      title: 'Die Konkurrenz zeigt, was sie kann',
+      text: 'Das konkurrierende Labor führt öffentlich ein System vor, das die Welt verblüfft.',
+      effect: 'In dieser Runde erhöhen Bedingt und Ablehnen den Wettlauf jeweils um 1 mehr.',
+    },
+    inspection: {
+      title: 'Unangekündigte Inspektion',
+      text: 'Internationale Inspekteure stehen unangemeldet vor der Tür und sehen der KI in die Bücher.',
+      effect: 'In dieser Runde darf der Rat zwei Marker verschieben statt einen.',
+    },
+  },
 };
+
+export function headlineFor(key, lang) {
+  const h = HEADLINES.find((x) => x.key === key);
+  if (!h) return null;
+  const base = { key, title: h.title, text: h.text, effect: h.effect, need: h.need || null };
+  return lang === 'de' ? { ...base, ...DE.headlines[key] } : base;
+}
 
 export function roundFor(round, lang) {
   return lang === 'de' ? { ...round, ...DE.rounds[round.key] } : round;

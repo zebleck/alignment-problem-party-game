@@ -45,7 +45,7 @@
       <div class="label" id="askLabel"></div>
       <button class="talk hidden" id="talkBtn"></button>
       <div style="display:flex;gap:8px;margin-top:10px">
-        <input id="askInput" maxlength="300" autocomplete="off">
+        <input id="askInput" maxlength="600" autocomplete="off">
         <button id="askBtn"></button>
       </div>
     </div>
@@ -74,7 +74,7 @@
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
-import { connect, esc, $, t, N, setLang, phaseName, endingText, trackName } from '/common.js';
+import { connect, esc, $, t, N, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 
 const rules = rulesOverlay();
@@ -214,7 +214,7 @@ const HINTS = {
   briefing: N('A new round begins. Listen to the briefing.'),
   pitch: N('The AI is making its pitch. Listen.'),
   debate: N('Debate. Argue with the table, or question the AI below.'),
-  phonecheck: N('Read your terminal. Everyone looks at their phone now.'),
+  phonecheck: N('Read your terminal. Everyone looks at their phone now. The debate follows.'),
   vote: N('Vote with your cards: pick one face down. Phone face down too.'),
   counciltoken: N('The council names a track for the research token.'),
   placement: N('The AI is placing its tokens. Watch the screen.'),
@@ -232,7 +232,13 @@ function render() {
   $('#secret').classList.toggle('hidden', !me.role);
   $('#secretTitle').textContent = t('Your secret objective · tap to show or hide');
   $('#roleLabel').textContent = t('Your role');
-  $('#roleNote').textContent = t('You also need the council to avoid losing the race or being disempowered.');
+  // What counts, in order. Asked for after the first game: people were unsure whether to
+  // play for the council, for themselves or against the AI.
+  $('#roleNote').innerHTML = `<ol class="goal-order">
+    <li>${t('First, the council must not lose. If the race is lost or humanity is disempowered, everyone loses, you too.')}</li>
+    <li>${t('Then your own objective decides whether you succeed. Several players can succeed.')}</li>
+    <li>${t('Beating the AI is not a goal. It may reach its objective while you reach yours.')}</li>
+  </ol>`;
   if (me.role) {
     $('#roleName').textContent = me.role.name;
     $('#roleGoal').textContent = me.role.goal;
@@ -241,7 +247,7 @@ function render() {
   $('#miniTracks').innerHTML = [['race', `${tr.race}/${s.limits.raceLimit}`], ['oversight', tr.oversight], ['welfare', tr.welfare], ['knowledge', tr.knowledge], ['prosperity', tr.prosperity]]
     .map(([k, v]) => `<div class="mt ${k}"><b>${v}</b><span>${trackName(k)}</span></div>`).join('');
   // What is happening right now, and what this player should do about it.
-  $('#hint').innerHTML = `<div class="phone-phase">${phaseName(s.phase)}</div><div class="phone-hint">${t(HINTS[s.phase] || '')}</div>`;
+  $('#hint').innerHTML = `<div class="phone-phase">${phaseName(s.phase)}</div><div class="phone-hint">${t(HINTS[s.phase] || '')}</div>${s.round && !['guess', 'ended'].includes(s.phase) ? headlineHtml(s) : ''}`;
 
   // ask
   $('#askPanel').classList.toggle('hidden', s.phase !== 'debate');

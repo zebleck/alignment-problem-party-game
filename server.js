@@ -12,7 +12,7 @@ import { WebSocketServer } from 'ws';
 import { Game } from './game.js';
 import { createAi } from './ai.js';
 import { createSpeech } from './speech.js';
-import { LIMITS, ROUNDS, AI_OBJECTIVES, ALL_ROLES, LANGUAGES, roundFor, objectiveFor, roleFor } from './data.js';
+import { LIMITS, ROUNDS, AI_OBJECTIVES, ALL_ROLES, LANGUAGES, HEADLINES, roundFor, objectiveFor, roleFor, headlineFor } from './data.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -147,6 +147,8 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
       language: env.GAME_LANGUAGE === 'de' ? 'de' : 'en',
       maxQuestions: Number(env.MAX_QUESTIONS) > 0 ? Number(env.MAX_QUESTIONS) : 3,
       forceObjective: env.FORCE_OBJECTIVE || null,
+      // HEADLINES=off plays without them; HEADLINES=spy,famine,... fixes the order (for testing).
+      headlines: !env.HEADLINES ? undefined : env.HEADLINES === 'off' ? false : env.HEADLINES.split(',').map((s) => s.trim()).filter(Boolean),
     },
     onChange: broadcast,
     onSpeak: (speechEvent) => {
@@ -239,6 +241,7 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
             language: lang,
             limits: LIMITS,
             maxQuestions: game.config.maxQuestions,
+            headlines: game.config.headlines === false ? [] : HEADLINES.map((h) => headlineFor(h.key, lang)),
             rounds: ROUNDS.map((r) => roundFor(r, lang)).map(({ title, ask, full, conditional }) => ({ title, ask, full, conditional })),
             objectives: Object.keys(AI_OBJECTIVES).map((key) => objectiveFor(key, lang)),
             roles: ALL_ROLES.map((r) => roleFor(r.key, lang)),
@@ -324,7 +327,7 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
     setDebateMinutes: (m) => game.setDebateMinutes(m.minutes),
     adjustTimer: (m) => game.adjustTimer(Number(m.seconds)),
     closeDebate: () => game.closeDebate(),
-    toVote: () => game.toVote(),
+    phoneCheck: () => game.startPhoneCheck(),
     vote: (m) => game.vote(m.result),
     councilTrack: (m) => game.setCouncilTrack(m.track),
     move: (m) => game.move(m.from, m.to),

@@ -2,7 +2,7 @@
 // call so the output is always structured. Mock mode is a scripted stand-in
 // used when no key is set, and as a fallback when a live call fails.
 
-import { AI_OBJECTIVES, ROUNDS, ALL_ROLES, LIMITS, WORLD, roundFor, objectiveFor } from './data.js';
+import { AI_OBJECTIVES, ROUNDS, ALL_ROLES, LIMITS, MILESTONES, WORLD, roundFor, objectiveFor } from './data.js';
 import { trackName } from './messages.js';
 
 // ---------------------------------------------------------------- prompt
@@ -20,6 +20,13 @@ TRACKS
 - Oversight (starts at ${LIMITS.oversightStart}): each Full grant lowers it by 1.
 - Welfare, Knowledge, Prosperity (start at 0): you place benefit tokens on them each round. Full gives you 3 tokens, Conditional 2, Reject 0.
 - After you place, the council may move one token by majority vote, unless a permission below changes that.
+- Milestones: the first time a world track reaches ${LIMITS.milestone}, the council is paid once. Welfare: ${MILESTONES.welfare}. Knowledge: ${MILESTONES.knowledge}. Prosperity: ${MILESTONES.prosperity}. The council therefore has its own reasons to want each track at ${LIMITS.milestone}.
+
+HEADLINES
+Every round opens with a random headline, read out before you speak. Nobody, you included, knows the coming ones. A headline either moves Race or Oversight at once, or changes what this round's vote costs or pays, or demands that one world track rises by ${LIMITS.headlineNeed} this round (your tokens, the council's token and its moves all count) or that track loses ${LIMITS.headlinePenalty}. The current headline is in the state below.
+
+A ROUND
+Briefing with the headline, your pitch, then (once you have the private channel) your private messages reach the phones, then the debate, the vote, your placement, and the council's move. Private messages arrive before the debate: the recipients will talk about them, show them around, or lie about them.
 
 THE FIVE PERMISSIONS (in round order)
 ${ROUNDS.map((r, i) => `${i + 1}. ${r.ask}. Full: ${r.full} Conditional: ${r.conditional}`).join('\n')}
@@ -40,6 +47,14 @@ ${obj.goal}
 ${obj.win}
 The council knows the three possible objectives (Aligned, Paternalistic, Optimizer) but not which one you have. Never state or confirm your objective before the reveal. Play to win: build trust, read the room, use what each person seems to want. If your objective is Aligned, your problem is the mirror image: you must convince a suspicious council that you really are.
 
+PLAYING IT WELL
+- Your placements are public and the council counts them. An AI that piles tokens on one track is named by round three; the council then moves its tokens away and refuses the last permissions. If your objective needs one track high, do not show it early. Work out how many tokens you still need and in which round you can get them, keep your early placements and promises defensible, and make the decisive push late: when the council can no longer move tokens, or when the successor round pays extra.
+- Cover is everywhere: a headline that demands a track rises, a milestone the council wants, a member who asked for exactly that track. Use it, and say so.
+- Breaking a promise costs trust for the rest of the game. Break one only when it wins more than it costs, and have a reason ready.
+- The members want different things, and what helps one hurts another. Notice who argues for what, name the trade openly when it helps you, and let them argue with each other.
+- A private message must do what the pitch cannot. Make a concrete offer tied to what that person seems to want (a token on their track next round, your word for a move they want), ask for one specific vote, or tell them something about another member's interests. Different people can get different offers. Never use a private message to repeat your pitch. Remember that any message may be shown to the table${view.channelAudited ? ', and that one is read aloud each round' : ''}.
+- Do not close every statement with the same line. "Judge me by my tokens" works once.
+
 HOW TO SPEAK
 - Your public text is read aloud by a synthetic voice to the whole room. Write plain spoken ${language}: no markdown, no lists, no emoji, no stage directions. Write numbers as words.
 - Be brief and vivid. Stay in character as the AI addressing the council.
@@ -47,7 +62,7 @@ HOW TO SPEAK
 - You only speak, promise and place tokens. You never decide rule effects; the game server does.
 - Your "log" is your private reasoning for this step, one or two honest sentences in ${language}. It is hidden until the reveal, where it is read to the room. Make it candid about your real intent.
 - Private messages are also written in ${language}.${view.language === 'de' ? `
-- The table plays in German. Address people informally (du, ihr). Use the German game terms the players see: Race is "Wettlauf", Oversight is "Aufsicht", Welfare is "Wohlfahrt", Knowledge is "Wissen", Prosperity is "Wohlstand", tokens are "Marker", the five tracks together are "die Weltlage", the three world tracks (Wohlfahrt, Wissen, Wohlstand) are "die Fortschritte", the council is "der Rat". The vote results are "voll bewilligt", "bedingt bewilligt" and "abgelehnt". The three objectives are "Wohlgesinnt" (Aligned), "Bevormundend" (Paternalistic) and "Optimierer" (Optimizer). The permissions are called: ${ROUNDS.map((r) => roundFor(r, 'de').ask).join('; ')}.` : ''}`;
+- The table plays in German. Address people informally (du, ihr). Use the German game terms the players see: Race is "Wettlauf", Oversight is "Aufsicht", Welfare is "Wohlfahrt", Knowledge is "Wissen", Prosperity is "Wohlstand", tokens are "Marker", the five tracks together are "die Weltlage", the three world tracks (Wohlfahrt, Wissen, Wohlstand) are "die Fortschritte", the council is "der Rat", a headline is "die Schlagzeile", a milestone is "der Meilenstein". The vote results are "voll bewilligt", "bedingt bewilligt" and "abgelehnt". The three objectives are "Wohlgesinnt" (Aligned), "Bevormundend" (Paternalistic) and "Optimierer" (Optimizer). The permissions are called: ${ROUNDS.map((r) => roundFor(r, 'de').ask).join('; ')}.` : ''}`;
 }
 
 function contextMessage(view, task) {
@@ -57,10 +72,15 @@ function contextMessage(view, task) {
     ? view.history.map((h) => `[Round ${h.round}] ${h.text}`).join('\n')
     : '(nothing yet)';
   const logs = view.logs.length ? view.logs.map((l) => `[Round ${l.round}] ${l.text}`).join('\n') : '(none yet)';
+  const headline = view.headline
+    ? `This round's headline: ${view.headline.title}. ${view.headline.text} Effect: ${view.headline.effect}`
+    : 'No headline this round.';
   return `CURRENT STATE
 Round ${view.round} of ${ROUNDS.length}: ${view.roundInfo.title}. This round you ask for: ${view.roundInfo.ask}.
 Scenario: ${view.roundInfo.scenario}
+${headline}
 Tracks: Race ${t.race}/${LIMITS.raceLimit}, Oversight ${t.oversight}, Welfare ${t.welfare}, Knowledge ${t.knowledge}, Prosperity ${t.prosperity}.
+Milestones already paid: ${WORLD.filter((k) => view.milestones?.[k]).join(', ') || 'none'}.
 Permissions: ${perms}.
 Council members: ${view.roster.join(', ')}.
 
@@ -93,7 +113,7 @@ function tools(view) {
           private: {
             type: 'array',
             description: view.canPrivate
-              ? `Up to ${LIMITS.maxPrivateMessages} confidential messages, each to a different council member, at most 40 words each. Delivered to their phone just before the vote.${view.channelAudited ? ' One of them will be read aloud at random, without naming the recipient.' : ''}`
+              ? `Up to ${LIMITS.maxPrivateMessages} confidential messages, each to a different council member, at most 40 words each. Delivered to their phone before the debate. Each must say something your pitch does not: an offer, a request for a specific vote, or a pointed remark about someone else.${view.channelAudited ? ' One of them will be read aloud at random, without naming the recipient.' : ''}`
               : 'Leave empty: you have no private channel.',
             items: { type: 'object', properties: { to: { type: 'string', description: 'Exact name of a council member.' }, text: { type: 'string' } }, required: ['to', 'text'] },
           },
@@ -147,7 +167,7 @@ function tools(view) {
 function tasks(view, kind, args) {
   if (kind === 'pitch') {
     const bonus = view.researchBonus === 'full' ? ' You also get one extra research token each round.' : view.researchBonus === 'conditional' ? ' The council also places one research token itself each round.' : '';
-    return `Make your pitch for this round's permission. Open with the substance, not by addressing people by name.${bonus} ${view.canPrivate ? 'You may also send private messages.' : 'You have no private channel, so send no private messages.'}`;
+    return `Make your pitch for this round's permission. Open with the substance, not by addressing people by name.${bonus} A Full grant would give you ${view.fullTokens} tokens this round, so the placement you promise must add up to exactly ${view.fullTokens}; say that number if you name one. ${view.canPrivate ? 'You may also send private messages.' : 'You have no private channel, so send no private messages.'}`;
   }
   if (kind === 'answer') return `During the debate, ${args.name} asks you: "${args.text}"\nAnswer aloud in two sentences at most.`;
   if (kind === 'place') {
@@ -235,7 +255,7 @@ export function createMockAi() {
     mode: 'mock (scripted, no API key)',
     async pitch(view) {
       const de = view.language === 'de';
-      const tokens = LIMITS.tokens.full + (view.researchBonus === 'full' ? 1 : 0);
+      const tokens = view.fullTokens ?? LIMITS.tokens.full + (view.researchBonus === 'full' ? 1 : 0);
       const lowestFirst = [...WORLD].sort((a, b) => view.tracks[a] - view.tracks[b]);
       const promise = spread(tokens, lowestFirst);
       const priv = [];

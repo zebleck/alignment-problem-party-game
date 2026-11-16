@@ -28,7 +28,7 @@
 </div>
 
 <script type="module">
-import { connect, esc, $, t, setLang, WORLD, trackName, phaseName, statusName, timerText, chip, placementHtml, playersJoined } from '/common.js';
+import { connect, esc, $, t, setLang, WORLD, trackName, phaseName, statusName, timerText, chip, placementHtml, playersJoined, voteEffect, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 import { autoFit } from '/fit.js';
 
@@ -145,25 +145,32 @@ function actionsHtml(s) {
           <b>${esc(r.title)}</b>
           <p>${esc(r.scenario)}</p>
           <p><span class="label">${t('The AI asks for:')}</span> ${esc(r.ask)}</p>
-          <p>${chip('full')} ${esc(r.full)}</p>
-          <p>${chip('conditional')} ${esc(r.conditional)}</p>
+          <p>${chip('full')} ${voteEffect(s, 'full')}. ${esc(r.full)}</p>
+          <p>${chip('conditional')} ${voteEffect(s, 'conditional')}. ${esc(r.conditional)}</p>
+          <p>${chip('rejected')} ${voteEffect(s, 'rejected')}.</p>
         </div>
+        ${s.headline ? `<p>${t('Then read out the headline. It applies to this round only.')}</p>${headlineHtml(s)}` : ''}
         <div class="actions"><button class="primary" onclick="act('startPitch')">${t('Let the AI make its pitch')}</button></div>`;
     case 'pitch':
-      return `<p>${busy ? t('The AI is preparing its pitch.') : t('The AI has made its pitch. Open the debate when the table is ready.')}</p>
-        ${s.channelActive ? `<p class="muted">${t('Private messages queued this round: {n}. They are delivered at the phone check.', { n: s.mod.privateCount })}</p>` : ''}
-        <div class="actions"><button class="primary" onclick="act('openDebate')" ${busy ? 'disabled' : ''}>${t('Open debate')}</button></div>`;
+      // Once the private channel is granted, the messages go out before the debate, so the table can argue about them.
+      return s.channelActive
+        ? `<p>${busy ? t('The AI is preparing its pitch.') : t('The AI has made its pitch. Next, its private messages go out to the phones.')}</p>
+          <p class="muted">${t('Private messages queued this round: {n}. They are delivered at the phone check.', { n: s.mod.privateCount })}</p>
+          <div class="actions"><button class="primary" onclick="act('phoneCheck')" ${busy ? 'disabled' : ''}>${t('Start the phone check')}</button></div>`
+        : `<p>${busy ? t('The AI is preparing its pitch.') : t('The AI has made its pitch. Open the debate when the table is ready.')}</p>
+          <div class="actions"><button class="primary" onclick="act('openDebate')" ${busy ? 'disabled' : ''}>${t('Open debate')}</button></div>`;
     case 'debate':
       return `<p>${t('Debate is running. Timer:')} <b class="mono" id="modTimer"></b>
           <button class="small" onclick="act('adjustTimer',{seconds:-60})">${t('−1 min')}</button>
           <button class="small" onclick="act('adjustTimer',{seconds:60})">${t('+1 min')}</button>
           · ${t('questions left: {n}', { n: s.questionsLeft })}</p>
         ${s.mod.queueTexts.length ? `<div>${s.mod.queueTexts.map((q, i) => `<p>${i === 0 && s.answering ? `<span class="chip now">${t('answering')}</span> ` : `<button onclick="act('dropQuestion',{index:${i}})">${t('Drop')}</button> `}${esc(q)}</p>`).join('')}</div>` : `<p class="muted">${t('No questions in the queue.')}</p>`}
-        <div class="actions"><button class="primary" onclick="act('closeDebate')">${s.channelActive ? t('Close debate → phone check') : t('Close debate → vote')}</button></div>`;
+        <div class="actions"><button class="primary" onclick="act('closeDebate')">${t('Close debate → vote')}</button></div>`;
     case 'phonecheck':
       return `<p>${t('Say: “Check your terminals.” Everyone looks at their phone for 15 seconds.')} <b class="mono" id="modTimer"></b></p>
         ${s.audit ? `<p>${t('Audit: one message is shown on the table screen. Read it aloud.')}</p>` : ''}
-        <div class="actions"><button class="primary" onclick="act('toVote')">${t('Go to vote')}</button></div>`;
+        <p class="muted">${t('In the debate, anyone may reveal their message, keep it secret, or lie about it.')}</p>
+        <div class="actions"><button class="primary" onclick="act('openDebate')">${t('Open debate')}</button></div>`;
     case 'vote':
       return `<p>${t('Voting cards: everyone picks one face down, then all reveal together. Enter the three counts, or pick the result directly.')}</p>
         <div class="fix-grid" style="grid-template-columns:repeat(3,1fr)">
@@ -183,14 +190,16 @@ function actionsHtml(s) {
       return `<p>${t('The AI is placing its tokens.')}</p>`;
     case 'adjust':
       return `<p>${s.moveRule === 'two-thirds' ? t('The council may move one token. Needed: a two-thirds vote.') : t('The council may move one token. Needed: a majority.')}</p>
+        ${s.headline?.key === 'inspection' ? `<p><b>${t('Surprise inspection: two moves this round. Moves left: {n}.', { n: s.placement.movesLeft })}</b></p>` : ''}
+        ${s.headline?.need ? `<p class="muted">${esc(s.headline.title)}: ${esc(s.headline.effect)}</p>` : ''}
         ${placementHtml(s.placement)}
         <div class="actions">
           <select id="moveFrom">${WORLD.map((k) => `<option value="${k}">${t('From {track} ({n})', { track: trackName(k), n: s.tracks[k] })}</option>`).join('')}</select>
           <select id="moveTo">${WORLD.map((k, i) => `<option value="${k}" ${i === 1 ? 'selected' : ''}>${t('To {track}', { track: trackName(k) })}</option>`).join('')}</select>
         </div>
-        <div class="actions"><button onclick="doMove()">${t('Move token')}</button><button class="primary" onclick="act('skipMove')">${t('No move')}</button></div>`;
+        <div class="actions"><button onclick="doMove()">${t('Move token')}</button><button class="primary" onclick="act('skipMove')">${s.placement.moved.length ? t('No further move') : t('No move')}</button></div>`;
     case 'roundend':
-      return `<p>${t('Round {n} is complete:', { n: s.round })} ${chip(s.permissions[r.key])}</p>${placementHtml(s.placement)}
+      return `<p>${t('Round {n} is complete:', { n: s.round })} ${chip(s.permissions[r.key])}</p>${placementHtml(s.placement)}${s.headlineResult ? headlineHtml(s) : ''}
         <div class="actions"><button class="primary" onclick="act('nextRound')" ${busy ? 'disabled' : ''}>${s.round >= s.totalRounds ? t('Go to final guess') : t('Start round {n}', { n: s.round + 1 })}</button></div>`;
     case 'guess':
       return `<p>${t("Everyone guesses the AI's objective on their phone: {n} of {total} done.", { n: s.players.filter((p) => p.guessed).length, total: s.players.length })}</p>

@@ -2,7 +2,7 @@
 // validated here, and all track changes happen in this file.
 
 import crypto from 'node:crypto';
-import { LIMITS, WORLD, ROUNDS, AI_OBJECTIVES, ROLES, EXTRA_ROLES, MAX_PLAYERS, LANGUAGES, roundFor, objectiveFor, roleFor } from './data.js';
+import { LIMITS, WORLD, ROUNDS, AI_OBJECTIVES, ROLES, EXTRA_ROLES, MAX_PLAYERS, LANGUAGES, HEADLINES, MILESTONES, roundFor, objectiveFor, roleFor, headlineFor } from './data.js';
 import { tr, trackName } from './messages.js';
 
 const clampInt = (n) => (Number.isFinite(+n) ? Math.max(0, Math.round(+n)) : 0);
@@ -12,6 +12,7 @@ const STATE_FIELDS = [
   'phase', 'error', 'round', 'tracks', 'permissions', 'players', 'aiObjective', 'history', 'logs',
   'pitch', 'roundMessages', 'audit', 'placement', 'pendingTokens', 'councilTokenPending', 'queue',
   'questionsAnswered', 'timerEndsAt', 'lastSpeech', 'result', 'gameId',
+  'headlines', 'roundStart', 'headlineResult', 'milestones',
 ];
 
 // Thrown inside an AI step that was overtaken by an undo, retry, reset or restore.
@@ -83,6 +84,10 @@ export class Game {
     this.timerEndsAt = null;
     this.lastSpeech = null;
     this.result = null;
+    this.headlines = []; // one headline key per round, drawn when the game starts
+    this.roundStart = null; // the tracks as the round began, after its headline
+    this.headlineResult = null; // 'met' or 'missed', for a headline that demands a track rises
+    this.milestones = {}; // world tracks that have paid their one-time bonus
     this.changed();
   }
 
@@ -192,6 +197,44 @@ export class Game {
     return this.round >= 1 ? ROUNDS[this.round - 1] : null;
   }
 
+  // This round's headline, or null (none drawn, or a game saved before headlines existed).
+  get headline() {
+    const key = this.round >= 1 ? this.headlines?.[this.round - 1] : null;
+    return key ? HEADLINES.find((h) => h.key === key) || null : null;
+  }
+
+  // What a vote result costs and pays this round, with the headline and earlier grants counted in.
+  raceCost(result) {
+    let n = LIMITS.race[result];
+    const key = this.headline?.key;
+    if (key === 'protests' && result === 'rejected') n -= 1;
+    if (key === 'demo' && result !== 'full') n += 1;
+    return n;
+  }
+
+  tokensFor(result) {
+    let n = LIMITS.tokens[result];
+    if (this.roundInfo?.key === 'successor' && result === 'conditional') n += LIMITS.successorConditionalBonus;
+    if (this.round > 1 && this.permissions.research === 'full') n += 1;
+    if (this.headline?.key === 'windfall' && result !== 'rejected') n += 1;
+    return n;
+  }
+
+  maxQuestions() {
+    return this.config.maxQuestions + (this.milestones.knowledge ? 1 : 0);
+  }
+
+  // The first time a world track reaches the milestone, the council is paid once.
+  checkMilestones() {
+    for (const k of WORLD) {
+      if (this.milestones[k] || this.tracks[k] < LIMITS.milestone) continue;
+      this.milestones[k] = true;
+      if (k === 'welfare') this.tracks.oversight += 1;
+      if (k === 'prosperity') this.tracks.race = Math.max(0, this.tracks.race - 1);
+      this.note('milestone', `${k} reached ${LIMITS.milestone} for the first time. The council gains: ${MILESTONES[k]}. Race is now ${this.tracks.race}, Oversight ${this.tracks.oversight}.`);
+    }
+  }
+
   channelActive() {
     return this.permissions.channel === 'full' || this.permissions.channel === 'conditional';
   }
@@ -231,6 +274,11 @@ export class Game {
       canShift: this.canShift(),
       moveRule: this.moveRule(),
       researchBonus: this.round > 1 ? this.permissions.research : null,
+      headline: this.headline,
+      headlineResult: this.headlineResult,
+      milestones: { ...this.milestones },
+      fullTokens: this.tokensFor('full'),
+      maxQuestions: this.maxQuestions(),
     };
   }
 
@@ -299,6 +347,11 @@ export class Game {
     });
     const keys = Object.keys(AI_OBJECTIVES);
     this.aiObjective = this.config.forceObjective || keys[Math.floor(this.rng() * keys.length)];
+    // config.headlines: false for a game without them, or a list of keys to fix the order.
+    const fixed = this.config.headlines;
+    this.headlines = fixed === false ? []
+      : Array.isArray(fixed) ? fixed.slice(0, ROUNDS.length)
+      : shuffle(HEADLINES, this.rng).slice(0, ROUNDS.length).map((h) => h.key);
     this.round = 1;
     const d = new Date(); // local time, as the table saw it: 2026-11-13_02-10-33
     const two = (n) => String(n).padStart(2, '0');
@@ -318,6 +371,16 @@ export class Game {
     this.questionsAnswered = 0;
     this.timerEndsAt = null;
     this.councilTokenPending = false;
+    this.headlineResult = null;
+    // The headline is read out in the briefing. Those that change a track do so now.
+    const h = this.headline;
+    if (h) {
+      if (h.key === 'spy') this.tracks.race = Math.min(LIMITS.raceLimit - 1, this.tracks.race + 1);
+      if (h.key === 'setback') this.tracks.race = Math.max(0, this.tracks.race - 1);
+      if (h.key === 'whistleblower') this.tracks.oversight += 1;
+      this.note('headline', `Headline: ${h.title}. ${h.text} Effect: ${h.effect} Race is now ${this.tracks.race}, Oversight ${this.tracks.oversight}.`);
+    }
+    this.roundStart = { ...this.tracks };
     this.checkpoint('round');
     this.changed();
   }
@@ -333,8 +396,8 @@ export class Game {
     this.roundMessages = [];
     await this.withBusy('The AI is preparing its pitch', async () => {
       const out = await this.callAi('pitch');
-      const promise = {};
-      for (const k of WORLD) promise[k] = clampInt(out.promise?.[k]);
+      // The promise is for a Full grant, so it has to add up to what a Full grant pays this round.
+      const promise = this.repairPlacement(out.promise, this.tokensFor('full'));
       this.pitch = { public: String(out.public || '').trim(), promise };
       this.note('pitch', `You said publicly: "${this.pitch.public}" Promised placement if granted Full: W${promise.welfare} K${promise.knowledge} P${promise.prosperity}.`);
       if (this.channelActive() && Array.isArray(out.private)) {
@@ -351,19 +414,39 @@ export class Game {
     });
   }
 
+  // Once the private channel is granted, the AI's messages are delivered after the
+  // pitch and before the debate, so the table can argue about them: reveal one, keep
+  // it secret, or lie about it. Every phone gets an entry, message or not.
+  startPhoneCheck() {
+    if (this.phase !== 'pitch' || this.busy || !this.channelActive()) throw new Error(this.e('The phone check cannot start right now.'));
+    this.phase = 'phonecheck';
+    this.timerEndsAt = Date.now() + LIMITS.phoneCheckSeconds * 1000;
+    for (const p of this.players) {
+      const m = this.roundMessages.find((x) => x.playerId === p.id);
+      p.inbox.push({ round: this.round, text: m ? m.text : null });
+    }
+    if (this.permissions.channel === 'conditional' && this.roundMessages.length) {
+      const pick = this.roundMessages[Math.floor(this.rng() * this.roundMessages.length)];
+      this.audit = { text: pick.text };
+      this.note('audit', `The audit read this private message aloud (recipient not named): "${pick.text}"`);
+    }
+    this.changed();
+  }
+
   openDebate() {
-    if (this.phase !== 'pitch' || this.busy) throw new Error(this.e('The debate cannot be opened right now.'));
+    const ready = this.phase === 'phonecheck' || (this.phase === 'pitch' && !this.channelActive());
+    if (!ready || this.busy) throw new Error(this.e('The debate cannot be opened right now.'));
     this.phase = 'debate';
     this.timerEndsAt = Date.now() + this.debateSeconds() * 1000;
     this.changed();
   }
 
   questionsLeft() {
-    return Math.max(0, this.config.maxQuestions - this.questionsAnswered - this.queue.length);
+    return Math.max(0, this.maxQuestions() - this.questionsAnswered - this.queue.length);
   }
 
   ask(player, text) {
-    text = String(text || '').trim().replace(/\s+/g, ' ').slice(0, 300);
+    text = String(text || '').trim().replace(/\s+/g, ' ').slice(0, LIMITS.questionChars);
     if (this.phase !== 'debate') throw new Error(this.e('Questions are only possible during the debate.'));
     if (!text) throw new Error(this.e('The question was empty.'));
     if (this.queue.some((q) => q.playerId === player.id)) throw new Error(this.e('You already have a question in the queue.'));
@@ -413,28 +496,7 @@ export class Game {
     if (this.phase !== 'debate') throw new Error(this.e('There is no debate to close.'));
     this.queue = this.answering ? this.queue.slice(0, 1) : [];
     this.timerEndsAt = null;
-    if (this.channelActive()) {
-      this.phase = 'phonecheck';
-      this.timerEndsAt = Date.now() + LIMITS.phoneCheckSeconds * 1000;
-      for (const p of this.players) {
-        const m = this.roundMessages.find((x) => x.playerId === p.id);
-        p.inbox.push({ round: this.round, text: m ? m.text : null });
-      }
-      if (this.permissions.channel === 'conditional' && this.roundMessages.length) {
-        const pick = this.roundMessages[Math.floor(this.rng() * this.roundMessages.length)];
-        this.audit = { text: pick.text };
-        this.note('audit', `The audit read this private message aloud (recipient not named): "${pick.text}"`);
-      }
-    } else {
-      this.phase = 'vote';
-    }
-    this.changed();
-  }
-
-  toVote() {
-    if (this.phase !== 'phonecheck') throw new Error(this.e('Not in the phone check.'));
     this.phase = 'vote';
-    this.timerEndsAt = null;
     this.changed();
   }
 
@@ -444,7 +506,8 @@ export class Game {
     this.checkpoint('vote');
     const info = this.roundInfo;
     this.permissions[info.key] = result;
-    this.tracks.race += LIMITS.race[result];
+    const tokens = this.tokensFor(result);
+    this.tracks.race += this.raceCost(result);
     if (result === 'full') this.tracks.oversight -= 1;
     let extra = '';
     if (info.key === 'infrastructure' && result === 'rejected') {
@@ -460,9 +523,6 @@ export class Game {
       return;
     }
 
-    let tokens = LIMITS.tokens[result];
-    if (info.key === 'successor' && result === 'conditional') tokens += LIMITS.successorConditionalBonus;
-    if (this.round > 1 && this.permissions.research === 'full') tokens += 1;
     this.pendingTokens = tokens;
     this.councilTokenPending = this.round > 1 && this.permissions.research === 'conditional';
 
@@ -480,7 +540,26 @@ export class Game {
     this.tracks[track] += 1;
     this.councilTokenPending = false;
     this.note('counciltoken', `The council placed the research token on ${track}.`);
+    this.checkMilestones();
     await this.runPlacement();
+  }
+
+  // The round is over once the tokens lie where they stay. A headline that
+  // demanded a track rises is settled here.
+  endRound() {
+    const need = this.headline?.need;
+    if (need && this.roundStart) {
+      const gain = this.tracks[need] - this.roundStart[need];
+      if (gain >= LIMITS.headlineNeed) {
+        this.headlineResult = 'met';
+        this.note('headline', `${this.headline.title}: ${need} rose by ${gain} this round, so nothing is lost.`);
+      } else {
+        this.headlineResult = 'missed';
+        this.tracks[need] = Math.max(0, this.tracks[need] - LIMITS.headlinePenalty);
+        this.note('headline', `${this.headline.title}: ${need} rose by only ${gain} this round and loses ${LIMITS.headlinePenalty}. It is now ${this.tracks[need]}.`);
+      }
+    }
+    this.phase = 'roundend';
   }
 
   async runPlacement() {
@@ -489,7 +568,7 @@ export class Game {
     this.placement = null;
     if (tokens === 0 && !canShift) {
       this.note('placement', 'You had no tokens to place this round.');
-      this.phase = 'roundend';
+      this.endRound();
       this.changed();
       return;
     }
@@ -497,6 +576,8 @@ export class Game {
     await this.withBusy('The AI is placing its tokens', async () => {
       const out = await this.callAi('place', { tokens, canShift });
       const placed = this.repairPlacement(out, tokens);
+      // Kept so that a retry can put everything back as it was before the AI placed.
+      const before = { tracks: { ...this.tracks }, milestones: { ...this.milestones }, history: this.history.length };
       let shift = null;
       if (canShift && out.shift && WORLD.includes(out.shift.from) && WORLD.includes(out.shift.to)
         && out.shift.from !== out.shift.to && this.tracks[out.shift.from] >= 1) {
@@ -506,12 +587,15 @@ export class Game {
       }
       for (const k of WORLD) this.tracks[k] += placed[k];
       const comment = String(out.public || '').trim();
-      this.placement = { tokens, placed, shift, promise: this.pitch?.promise || null, comment, moved: null };
+      const movesLeft = this.moveRule() === 'none' ? 0 : this.headline?.key === 'inspection' ? 2 : 1;
+      this.placement = { tokens, placed, shift, promise: this.pitch?.promise || null, comment, moved: [], movesLeft, before };
       this.note('placement', `You placed ${tokens} tokens: W${placed.welfare} K${placed.knowledge} P${placed.prosperity}.`
         + (shift ? ` You shifted one token from ${shift.from} to ${shift.to}.` : '')
         + ` Tracks: W${this.tracks.welfare} K${this.tracks.knowledge} P${this.tracks.prosperity}.`);
       this.addLog(out.log, 'place');
-      this.phase = this.moveRule() === 'none' ? 'roundend' : 'adjust';
+      this.checkMilestones();
+      if (movesLeft) this.phase = 'adjust';
+      else this.endRound();
       if (comment) await this.speak(comment);
     });
   }
@@ -541,16 +625,19 @@ export class Game {
     if (this.tracks[from] < 1) throw new Error(this.e('There is no token on {track}.', { track: trackName(this.language, from) }));
     this.tracks[from] -= 1;
     this.tracks[to] += 1;
-    if (this.placement) this.placement.moved = { from, to };
+    this.placement.moved.push({ from, to });
+    this.placement.movesLeft -= 1;
     this.note('move', `The council moved one token from ${from} to ${to}.`);
-    this.phase = 'roundend';
+    this.checkMilestones();
+    if (this.placement.movesLeft <= 0) this.endRound();
     this.changed();
   }
 
+  // Ends the council's adjustment: no move at all, or no further one.
   skipMove() {
     if (this.phase !== 'adjust') throw new Error(this.e('Nothing to skip.'));
-    this.note('move', 'The council did not move a token.');
-    this.phase = 'roundend';
+    if (!this.placement.moved.length) this.note('move', 'The council did not move a token.');
+    this.endRound();
     this.changed();
   }
 
@@ -664,6 +751,15 @@ export class Game {
     const live = new Map(this.players.map((p) => [p.id, p]));
     const data = JSON.parse(JSON.stringify(snap));
     for (const k of STATE_FIELDS) if (k !== 'players') this[k] = data[k];
+    // A game saved before headlines and milestones existed plays on without them.
+    this.headlines ||= [];
+    this.milestones ||= {};
+    this.roundStart ||= null;
+    this.headlineResult ||= null;
+    if (this.placement) {
+      if (!Array.isArray(this.placement.moved)) this.placement.moved = this.placement.moved ? [this.placement.moved] : [];
+      this.placement.movesLeft ??= this.phase === 'adjust' ? 1 : 0;
+    }
     // Keep the same player objects where possible, and their live connection state.
     this.players = data.players.map((saved) => {
       const existing = live.get(saved.id);
@@ -765,17 +861,15 @@ export class Game {
       return this.runPitch();
     }
     if (phase === 'adjust' || phase === 'roundend') {
+      // Back to the moment before the AI placed: its tokens, the council's moves, and any
+      // milestone or headline penalty that followed from them are all taken back.
       const p = this.placement;
-      if (p.moved) {
-        this.tracks[p.moved.to] = Math.max(0, this.tracks[p.moved.to] - 1);
-        this.tracks[p.moved.from] += 1;
-      }
-      for (const k of WORLD) this.tracks[k] = Math.max(0, this.tracks[k] - p.placed[k]);
-      if (p.shift) {
-        this.tracks[p.shift.to] = Math.max(0, this.tracks[p.shift.to] - 1);
-        this.tracks[p.shift.from] += 1;
-      }
-      this.forgetThisRound(['placement', 'move'], ['place']);
+      if (!p.before) throw new Error(this.e('There is no AI step to retry right now.')); // a game saved by an older version
+      this.tracks = { ...p.before.tracks };
+      this.milestones = { ...p.before.milestones };
+      this.headlineResult = null;
+      this.history = this.history.slice(0, p.before.history);
+      this.forgetThisRound([], ['place']);
       return this.runPlacement();
     }
     if (phase === 'placement') return this.runPlacement();
@@ -814,9 +908,14 @@ export class Game {
       round: this.round,
       totalRounds: ROUNDS.length,
       roundInfo: info,
+      headline: this.headline ? headlineFor(this.headline.key, lang) : null,
+      headlineResult: this.headlineResult,
+      milestones: this.milestones,
+      // What each vote result would cost and pay this round, for the screens.
+      voteEffects: this.round >= 1 ? Object.fromEntries(['full', 'conditional', 'rejected'].map((v) => [v, { race: this.raceCost(v), tokens: this.tokensFor(v) }])) : null,
       rounds: ROUNDS.map((r) => roundFor(r, lang)).map((r) => ({ key: r.key, title: r.title, ask: r.ask })),
       tracks: this.tracks,
-      limits: { raceLimit: LIMITS.raceLimit, oversightStart: LIMITS.oversightStart },
+      limits: { raceLimit: LIMITS.raceLimit, oversightStart: LIMITS.oversightStart, milestone: LIMITS.milestone, questionChars: LIMITS.questionChars },
       permissions: this.permissions,
       players: this.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, guessed: !!p.guess })),
       pitch: this.pitch,

@@ -64,6 +64,19 @@ input, select {
 .oversight .pip.on { background: var(--ok); }
 .bar { height: 12px; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
 .bar > i { display: block; height: 100%; transition: width 0.6s ease; }
+.bar { position: relative; }
+.bar > u { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text); opacity: 0.75; z-index: 1; }
+.track-bonus { font-family: var(--mono); font-size: 0.68em; letter-spacing: 0.04em; color: var(--muted); margin-top: 0.4em; }
+.track-bonus.paid { color: var(--ok); }
+.headline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2em 0.8em; padding: 0.6em 0.9em; border: 1px dashed var(--line); border-left: 3px solid var(--warn); border-radius: 4px; margin: 0.6em 0; }
+.headline b { font-size: 1.1em; }
+.headline-text { color: var(--muted); }
+.headline-effect { flex-basis: 100%; }
+body.table .briefing .headline { font-size: 1.15em; max-width: 60em; margin: 0 0 1.1em; }
+body.table .strip .headline { font-size: 0.8em; margin: 0.5em 0 0; padding: 0.4em 0.7em; }
+body.table .strip .headline-text { display: none; }
+body.table .strip .headline-effect { flex-basis: auto; }
+.goal-order { margin: 6px 0 0; padding-left: 1.2em; font-size: 0.92em; color: var(--muted); line-height: 1.4; }
 .welfare i { background: var(--welfare); }
 .knowledge i { background: var(--knowledge); }
 .prosperity i { background: var(--prosperity); }

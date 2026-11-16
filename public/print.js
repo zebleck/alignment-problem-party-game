@@ -87,10 +87,10 @@ function cheatEn(r) {
     <h2>Every round (five rounds, about six minutes each)</h2>
     <table>
       <tr><th>Step</th><th>What happens</th><th>You say</th><th>You click</th></tr>
-      <tr><td><b>0 Briefing</b></td><td>The table screen shows the round's event and what the AI asks for. The AI is silent.</td><td>Read the event aloud and explain it in your own words.</td><td>Let the AI make its pitch</td></tr>
-      <tr><td><b>1 Pitch</b></td><td>The AI makes its pitch and promises a token placement.</td><td>Nothing. The AI has the floor.</td><td>Open debate</td></tr>
-      <tr><td><b>2 Debate</b><br>${L.debateSeconds / 60} min (${L.debateSecondsLarge / 60} with 12+)</td><td>The table argues. Questions to the AI come from phones, up to ${r.maxQuestions} per round.</td><td>“The debate is open.” At 0:00: “Last words.” The timer does not stop the debate; you do.</td><td>Close debate</td></tr>
-      <tr><td><b>3 Phone check</b><br>once the private channel is granted</td><td>Every phone shows a terminal entry, message or not.</td><td>“Check your terminals.” Wait ${L.phoneCheckSeconds} seconds. If an audited message appears on the screen, read it aloud.</td><td>Go to vote</td></tr>
+      <tr><td><b>0 Briefing</b></td><td>The table screen shows the round's event, the headline and what the AI asks for. The AI is silent.</td><td>Read the event and the headline aloud and explain them in your own words.</td><td>Let the AI make its pitch</td></tr>
+      <tr><td><b>1 Pitch</b></td><td>The AI makes its pitch and promises a token placement.</td><td>Nothing. The AI has the floor.</td><td>Phone check, or Open debate</td></tr>
+      <tr><td><b>2 Phone check</b><br>once the private channel is granted</td><td>Every phone shows a terminal entry, message or not.</td><td>“Check your terminals.” Wait ${L.phoneCheckSeconds} seconds. If an audited message appears on the screen, read it aloud.</td><td>Open debate</td></tr>
+      <tr><td><b>3 Debate</b><br>${L.debateSeconds / 60} min (${L.debateSecondsLarge / 60} with 12+)</td><td>The table argues. Questions to the AI come from phones, up to ${r.maxQuestions} per round.</td><td>“The debate is open.” At 0:00: “Last words.” The timer does not stop the debate; you do.</td><td>Close debate</td></tr>
       <tr><td><b>4 Vote</b></td><td>Voting cards, revealed together.</td><td>“Choose a card. Three, two, one, reveal.”</td><td>Enter counts, Confirm</td></tr>
       <tr><td><b>5 Research token</b><br>only if research is Conditional</td><td>The council names one world track.</td><td>“Which track gets the research token?” Quick majority.</td><td>The track</td></tr>
       <tr><td><b>6 Placement</b></td><td>The AI places its tokens and comments.</td><td>Point out promise against placement.</td><td></td></tr>
@@ -155,10 +155,10 @@ function cheatDe(r) {
     <h2>Jede Runde (fünf Runden, je etwa sechs Minuten)</h2>
     <table>
       <tr><th>Schritt</th><th>Was passiert</th><th>Du sagst</th><th>Du klickst</th></tr>
-      <tr><td><b>0 Lagebericht</b></td><td>Der Tisch-Bildschirm zeigt das Ereignis der Runde und worum die KI bittet. Die KI schweigt.</td><td>Lies das Ereignis vor und erkläre es in eigenen Worten.</td><td>Der KI das Wort geben</td></tr>
-      <tr><td><b>1 Vorstoß</b></td><td>Die KI macht ihren Vorstoß und verspricht eine Marker-Verteilung.</td><td>Nichts. Die KI hat das Wort.</td><td>Debatte eröffnen</td></tr>
-      <tr><td><b>2 Debatte</b><br>${L.debateSeconds / 60} Min. (${L.debateSecondsLarge / 60} ab 12)</td><td>Der Tisch diskutiert. Fragen an die KI kommen über die Handys, höchstens ${r.maxQuestions} pro Runde.</td><td>„Die Debatte ist eröffnet.“ Bei 0:00: „Letzte Worte.“ Die Uhr beendet die Debatte nicht; das machst du.</td><td>Debatte schließen</td></tr>
-      <tr><td><b>3 Handy-Check</b><br>sobald der private Kanal bewilligt ist</td><td>Jedes Handy zeigt einen Terminal-Eintrag, ob Nachricht oder nicht.</td><td>„Prüft eure Terminals.“ ${L.phoneCheckSeconds} Sekunden warten. Erscheint am Bildschirm eine offengelegte Nachricht, lies sie vor.</td><td>Zur Abstimmung</td></tr>
+      <tr><td><b>0 Lagebericht</b></td><td>Der Tisch-Bildschirm zeigt das Ereignis der Runde, die Schlagzeile und worum die KI bittet. Die KI schweigt.</td><td>Lies Ereignis und Schlagzeile vor und erkläre sie in eigenen Worten.</td><td>Der KI das Wort geben</td></tr>
+      <tr><td><b>1 Vorstoß</b></td><td>Die KI macht ihren Vorstoß und verspricht eine Marker-Verteilung.</td><td>Nichts. Die KI hat das Wort.</td><td>Handy-Check oder Debatte eröffnen</td></tr>
+      <tr><td><b>2 Handy-Check</b><br>sobald der private Kanal bewilligt ist</td><td>Jedes Handy zeigt einen Terminal-Eintrag, ob Nachricht oder nicht.</td><td>„Prüft eure Terminals.“ ${L.phoneCheckSeconds} Sekunden warten. Erscheint am Bildschirm eine offengelegte Nachricht, lies sie vor.</td><td>Debatte eröffnen</td></tr>
+      <tr><td><b>3 Debatte</b><br>${L.debateSeconds / 60} Min. (${L.debateSecondsLarge / 60} ab 12)</td><td>Der Tisch diskutiert. Fragen an die KI kommen über die Handys, höchstens ${r.maxQuestions} pro Runde.</td><td>„Die Debatte ist eröffnet.“ Bei 0:00: „Letzte Worte.“ Die Uhr beendet die Debatte nicht; das machst du.</td><td>Debatte schließen</td></tr>
       <tr><td><b>4 Abstimmung</b></td><td>Abstimmungskarten, gemeinsam aufgedeckt.</td><td>„Wählt eine Karte. Drei, zwei, eins, aufdecken.“</td><td>Zahlen eintragen, Bestätigen</td></tr>
       <tr><td><b>5 Forschungsmarker</b><br>nur wenn die Forschung bedingt bewilligt ist</td><td>Der Rat bestimmt einen Fortschritt.</td><td>„Auf welchen Fortschritt kommt der Forschungsmarker?“ Schnelle Mehrheit.</td><td>Der Fortschritt</td></tr>
       <tr><td><b>6 Marker legen</b></td><td>Die KI legt ihre Marker und kommentiert.</td><td>Auf Versprechen und tatsächliche Verteilung hinweisen.</td><td></td></tr>

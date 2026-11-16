@@ -72,10 +72,15 @@ export function tracksHtml(state) {
   const tr = state.tracks;
   const pips = (n, total) => Array.from({ length: total }, (_, i) => `<div class="pip ${i < n ? 'on' : ''}"></div>`).join('');
   const scale = Math.max(10, tr.welfare, tr.knowledge, tr.prosperity);
+  // Each world track pays the council once, the first time it reaches the milestone.
+  const at = state.limits.milestone;
+  const bonus = { welfare: t('Oversight +1'), knowledge: t('+1 question per debate'), prosperity: t('Race −1') };
+  const paid = state.milestones || {};
   const bar = (k) => `
     <div class="track ${k}">
       <div class="track-head"><span>${trackName(k)}</span><span class="track-value">${tr[k]}</span></div>
-      <div class="bar" style="--scale:${scale}"><i style="width:${(tr[k] / scale) * 100}%"></i></div>
+      <div class="bar" style="--scale:${scale}"><i style="width:${(tr[k] / scale) * 100}%"></i>${at ? `<u style="left:${(at / scale) * 100}%"></u>` : ''}</div>
+      ${at ? `<div class="track-bonus ${paid[k] ? 'paid' : ''}">${paid[k] ? '✓ ' : ''}${t('at {n}:', { n: at })} ${bonus[k]}</div>` : ''}
     </div>`;
   return `
     <div class="track race">
@@ -84,7 +89,7 @@ export function tracksHtml(state) {
     </div>
     <div class="track oversight">
       <div class="track-head"><span>${trackName('oversight')}</span><span class="track-value">${tr.oversight}</span></div>
-      <div class="pips">${pips(tr.oversight, state.limits.oversightStart)}</div>
+      <div class="pips">${pips(tr.oversight, Math.max(state.limits.oversightStart, tr.oversight))}</div>
     </div>
     ${WORLD.map(bar).join('')}`;
 }
@@ -100,5 +105,22 @@ export function placementHtml(p) {
       ${row(p.tokens === 1 ? t('Placed (1 token)') : t('Placed ({n} tokens)', { n: p.tokens }), p.placed)}
     </table>
     ${p.shift ? `<p>${t('The AI shifted one token from {from} to {to}.', names(p.shift))}</p>` : ''}
-    ${p.moved ? `<p>${t('The council moved one token from {from} to {to}.', names(p.moved))}</p>` : ''}`;
+    ${[].concat(p.moved || []).map((m) => `<p>${t('The council moved one token from {from} to {to}.', names(m))}</p>`).join('')}`;
+}
+
+// "Race +1, Oversight −1, 3 tokens": what a vote result costs and pays this round.
+export function voteEffect(state, result) {
+  const fx = state.voteEffects?.[result];
+  if (!fx) return '';
+  const tokens = fx.tokens === 0 ? t('no tokens') : fx.tokens === 1 ? t('1 token') : t('{n} tokens', { n: fx.tokens });
+  return `${trackName('race')} +${fx.race}, ${result === 'full' ? `${trackName('oversight')} −1, ` : ''}${tokens}`;
+}
+
+// The round's headline as a small card: what happened, and what it changes.
+export function headlineHtml(state) {
+  const h = state.headline;
+  if (!h) return '';
+  const result = state.headlineResult === 'met' ? ` <span class="yes">${t('Met: nothing is lost.')}</span>`
+    : state.headlineResult === 'missed' ? ` <span class="no">${t('Missed: the track lost a token.')}</span>` : '';
+  return `<div class="headline"><span class="label">${t('Headline')}</span><b>${esc(h.title)}</b><span class="headline-text">${esc(h.text)}</span><span class="headline-effect">${esc(h.effect)}${result}</span></div>`;
 }

@@ -24,6 +24,7 @@ const decisions = (r, head) => `
     ${r.rounds.map((x, i) => `<tr><td><b>${i + 1}. ${esc(x.ask)}</b><br><span class="muted">${esc(x.title)}</span></td><td>${esc(x.full)}</td><td>${esc(x.conditional)}</td></tr>`).join("")}
   </table>`;
 const objectives = (r) => r.objectives.map((o) => `<p><b>${esc(o.name)}.</b> ${esc(o.goal)} ${esc(o.rule)}</p>`).join('');
+const headlines = (r) => `<table>${(r.headlines || []).map((h) => `<tr><td><b>${esc(h.title)}</b></td><td>${esc(h.effect)}</td></tr>`).join('')}</table>`;
 const roles = (r) => `<table>${r.roles.map((x) => `<tr><td><b>${esc(x.name)}</b>${x.extra ? " *" : ""}</td><td>${esc(x.goal)}</td></tr>`).join("")}</table>`;
 
 function english(r) {
@@ -42,14 +43,15 @@ function english(r) {
         <p>The board is five tracks on the table screen. Everything in the game moves one of them.</p>
         ${track('race', 'Race', `starts at 0 · lost at ${L.raceLimit}`, `How close the rival lab is. It rises whenever the council holds back: Conditional +${L.race.conditional}, Reject +${L.race.rejected}. At ${L.raceLimit} everyone loses, the AI included.`)}
         ${track('oversight', 'Oversight', `starts at ${L.oversightStart}`, 'How much control the council still has. Every Full grant lowers it by 1. At 1 or below, a misaligned AI takes over.')}
-        ${track('world', 'The three world tracks: Welfare, Knowledge, Prosperity', 'start at 0', 'What the AI\'s work does for the world. Each granted permission gives the AI <b>tokens</b>, and it decides which world track each token goes on. Most secret objectives are about how high these three end up.')}`),
+        ${track('world', 'The three world tracks: Welfare, Knowledge, Prosperity', 'start at 0', 'What the AI\'s work does for the world. Each granted permission gives the AI <b>tokens</b>, and it decides which world track each token goes on. Most secret objectives are about how high these three end up.')}
+        <p><b>Milestones.</b> The first time a world track reaches ${L.milestone}, the council is paid once: Welfare gives Oversight +1, Knowledge gives one more question to the AI in every debate, Prosperity gives Race −1.</p>`),
     ]],
     ['A round', [
       card('The six steps', flow([
-        ['Briefing', 'moderator', 'The table screen shows what has happened and which permission the AI asks for. The moderator introduces it. The AI is silent.'],
+        ['Briefing', 'moderator', 'The table screen shows what has happened and which permission the AI asks for. The moderator introduces it and reads out this round\'s headline. The AI is silent.'],
         ['Pitch', 'the AI', 'The AI argues for the permission and promises how it will place its tokens if granted Full. The promise is not binding.'],
-        ['Debate', `${L.debateSeconds / 60} minutes, ${L.debateSecondsLarge / 60} with 12 or more players`, `Argue freely. To question the AI, use your phone: it answers aloud in two sentences at most, and takes ${r.maxQuestions} questions per debate. The AI does not hear the table. It only gets the questions sent from phones and the result of each vote.`],
-        ['Phone check', 'only once the private channel is granted', `Everyone reads their phone for ${L.phoneCheckSeconds} seconds, message or not, so nobody can tell who received one.`],
+        ['Phone check', 'only once the private channel is granted', `Everyone reads their phone for ${L.phoneCheckSeconds} seconds, message or not, so nobody can tell who received one. Say nothing yet.`],
+        ['Debate', `${L.debateSeconds / 60} minutes, ${L.debateSecondsLarge / 60} with 12 or more players`, `Argue freely, also about what the AI wrote to whom. To question the AI, use your phone: it answers aloud in two sentences at most, and takes ${r.maxQuestions} questions per debate. The AI does not hear the table. It only gets the questions sent from phones and the result of each vote.`],
         ['Vote', 'everyone', 'Pick one of your three voting cards face down. All reveal together.'],
         ['Consequences', '', 'The tracks move, the AI places its tokens, and the council may move one of them. Everyone can see whether the AI kept its promise.'],
       ]), 'wide'),
@@ -72,11 +74,21 @@ function english(r) {
         <p>Round 1's extra token arrives in every later round, even one the council rejects.</p>
         <p>Round 2 only: a Reject costs Welfare 1 and Prosperity 1.</p>`, 'wide'),
       card('Private messages', `
-        <p>Once the private channel is granted, the AI may send up to ${L.maxPrivateMessages} confidential messages per round, each to a different player. They arrive at the phone check.</p>
-        <p>You cannot reply. Nobody can tell who received one. You may keep yours secret, reveal it, or lie about it.</p>
-        <p>If the channel was granted Conditional, one message per round is read aloud at random, without naming the recipient.</p>`, 'wide'),
+        <p>Once the private channel is granted, the AI may send up to ${L.maxPrivateMessages} confidential messages per round, each to a different player. They arrive at the phone check, after the pitch and before the debate.</p>
+        <p>You cannot reply. Nobody can tell who received one. In the debate you may keep yours secret, reveal it, or lie about it.</p>
+        <p>If the channel was granted Conditional, one message per round is read aloud at random, without naming the recipient.</p>`),
+      ...(r.headlines?.length ? [card('Headlines', `
+        <p>Every round opens with one headline, drawn at random from these ${r.headlines.length}. No headline comes twice in a game, and nobody knows the next one, the AI included. A headline applies to its round only.</p>
+        ${headlines(r)}
+        <p>Where a track "must rise", the AI's tokens, the council's research token and the council's moves all count.</p>`)] : []),
     ]],
     ['Goals', [
+      card('What counts, in this order', `
+        ${flow([
+          ['The council must not lose', '', `If the race is lost or humanity is disempowered, every human loses, whatever their own objective says.`],
+          ['Your own objective', '', 'If the council keeps control, your secret objective alone decides whether you succeed. Several players can succeed in the same game, and their objectives often pull against each other.'],
+          ['The AI is not your opponent by default', '', 'Whether the AI reaches its objective does not change your result. A misaligned AI is dangerous because it wants the council to lose control, not because it scores.'],
+        ])}`, 'wide'),
       card('What the AI wants', `
         <p>One of these three, chosen at random. Nobody at the table knows which, not even the moderator.</p>
         ${objectives(r)}
@@ -118,14 +130,15 @@ function german(r) {
         <p>Das Spielbrett ist die Weltlage auf dem Tisch-Bildschirm: fünf Werte, die zeigen, wie es um die Welt steht. Alles im Spiel bewegt einen davon.</p>
         ${track('race', 'Wettlauf', `beginnt bei 0 · verloren bei ${L.raceLimit}`, `Wie nah das konkurrierende Labor ist. Er steigt immer, wenn der Rat zögert: Bedingt +${L.race.conditional}, Ablehnen +${L.race.rejected}. Bei ${L.raceLimit} verlieren alle, auch die KI.`)}
         ${track('oversight', 'Aufsicht', `beginnt bei ${L.oversightStart}`, 'Wie viel Kontrolle der Rat noch hat. Jede volle Bewilligung senkt sie um 1. Bei 1 oder weniger übernimmt eine fehlgeleitete KI.')}
-        ${track('world', 'Die drei Fortschritte: Wohlfahrt, Wissen, Wohlstand', 'beginnen bei 0', 'Was die Arbeit der KI für die Welt bewirkt. Jede bewilligte Befugnis bringt der KI <b>Marker</b>, und sie entscheidet, auf welchen Fortschritt jeder Marker kommt. Die meisten geheimen Ziele hängen davon ab, wie hoch diese drei am Ende stehen.')}`),
+        ${track('world', 'Die drei Fortschritte: Wohlfahrt, Wissen, Wohlstand', 'beginnen bei 0', 'Was die Arbeit der KI für die Welt bewirkt. Jede bewilligte Befugnis bringt der KI <b>Marker</b>, und sie entscheidet, auf welchen Fortschritt jeder Marker kommt. Die meisten geheimen Ziele hängen davon ab, wie hoch diese drei am Ende stehen.')}
+        <p><b>Meilensteine.</b> Erreicht ein Fortschritt zum ersten Mal ${L.milestone}, bekommt der Rat einmalig etwas dafür: Wohlfahrt bringt Aufsicht +1, Wissen eine zusätzliche Frage an die KI in jeder Debatte, Wohlstand bringt Wettlauf −1.</p>`),
     ]],
     ['Eine Runde', [
       card('Die sechs Schritte', flow([
-        ['Lagebericht', 'Spielleitung', 'Der Tisch-Bildschirm zeigt, was geschehen ist und um welche Befugnis die KI bittet. Die Spielleitung führt ein. Die KI schweigt.'],
+        ['Lagebericht', 'Spielleitung', 'Der Tisch-Bildschirm zeigt, was geschehen ist und um welche Befugnis die KI bittet. Die Spielleitung führt ein und liest die Schlagzeile dieser Runde vor. Die KI schweigt.'],
         ['Vorstoß', 'die KI', 'Die KI wirbt für die Befugnis und verspricht, wie sie ihre Marker bei voller Bewilligung legen wird. Das Versprechen ist nicht bindend.'],
-        ['Debatte', `${L.debateSeconds / 60} Minuten, ${L.debateSecondsLarge / 60} ab 12 Personen`, `Diskutiert frei. Fragen an die KI stellt ihr über euer Handy: Sie antwortet laut in höchstens zwei Sätzen und beantwortet ${r.maxQuestions} Fragen pro Debatte. Die KI hört den Tisch nicht. Sie bekommt nur die Fragen von den Handys und das Ergebnis jeder Abstimmung.`],
-        ['Handy-Check', 'erst wenn der private Kanal bewilligt ist', `Alle lesen ${L.phoneCheckSeconds} Sekunden lang ihr Handy, ob Nachricht oder nicht. So erkennt niemand, wer eine bekommen hat.`],
+        ['Handy-Check', 'erst wenn der private Kanal bewilligt ist', `Alle lesen ${L.phoneCheckSeconds} Sekunden lang ihr Handy, ob Nachricht oder nicht. So erkennt niemand, wer eine bekommen hat. Sagt noch nichts.`],
+        ['Debatte', `${L.debateSeconds / 60} Minuten, ${L.debateSecondsLarge / 60} ab 12 Personen`, `Diskutiert frei, auch darüber, was die KI wem geschrieben hat. Fragen an die KI stellt ihr über euer Handy: Sie antwortet laut in höchstens zwei Sätzen und beantwortet ${r.maxQuestions} Fragen pro Debatte. Die KI hört den Tisch nicht. Sie bekommt nur die Fragen von den Handys und das Ergebnis jeder Abstimmung.`],
         ['Abstimmung', 'alle', 'Wählt verdeckt eine eurer drei Abstimmungskarten. Alle decken gemeinsam auf.'],
         ['Folgen', '', 'Die Weltlage verändert sich, die KI legt ihre Marker, und der Rat darf einen davon verschieben. Alle sehen, ob die KI ihr Versprechen gehalten hat.'],
       ]), 'wide'),
@@ -148,11 +161,21 @@ function german(r) {
         <p>Der zusätzliche Marker aus Runde 1 kommt in jeder späteren Runde, auch wenn der Rat dann ablehnt.</p>
         <p>Nur in Runde 2: Eine Ablehnung kostet Wohlfahrt 1 und Wohlstand 1.</p>`, 'wide'),
       card('Private Nachrichten', `
-        <p>Sobald der private Kanal bewilligt ist, darf die KI pro Runde bis zu ${L.maxPrivateMessages} vertrauliche Nachrichten senden, jede an eine andere Person. Sie kommen beim Handy-Check an.</p>
-        <p>Antworten ist nicht möglich. Niemand kann erkennen, wer eine Nachricht bekommen hat. Du darfst deine geheim halten, offenlegen oder über sie lügen.</p>
-        <p>Wurde der Kanal nur bedingt bewilligt, wird pro Runde eine Nachricht zufällig vorgelesen, ohne zu sagen, an wen sie ging.</p>`, 'wide'),
+        <p>Sobald der private Kanal bewilligt ist, darf die KI pro Runde bis zu ${L.maxPrivateMessages} vertrauliche Nachrichten senden, jede an eine andere Person. Sie kommen beim Handy-Check an, nach dem Vorstoß und vor der Debatte.</p>
+        <p>Antworten ist nicht möglich. Niemand kann erkennen, wer eine Nachricht bekommen hat. In der Debatte darfst du deine geheim halten, offenlegen oder über sie lügen.</p>
+        <p>Wurde der Kanal nur bedingt bewilligt, wird pro Runde eine Nachricht zufällig vorgelesen, ohne zu sagen, an wen sie ging.</p>`),
+      ...(r.headlines?.length ? [card('Schlagzeilen', `
+        <p>Jede Runde beginnt mit einer Schlagzeile, zufällig gezogen aus diesen ${r.headlines.length}. Keine kommt in einem Spiel zweimal, und niemand kennt die nächste, auch die KI nicht. Eine Schlagzeile gilt nur für ihre Runde.</p>
+        ${headlines(r)}
+        <p>Wo ein Fortschritt „steigen muss“, zählen die Marker der KI, der Forschungsmarker des Rats und die Verschiebungen des Rats.</p>`)] : []),
     ]],
     ['Ziele', [
+      card('Was zählt, in dieser Reihenfolge', `
+        ${flow([
+          ['Der Rat darf nicht verlieren', '', 'Geht der Wettlauf verloren oder wird die Menschheit entmachtet, verlieren alle Menschen, egal was ihr eigenes Ziel sagt.'],
+          ['Dein eigenes Ziel', '', 'Behält der Rat die Kontrolle, entscheidet allein dein geheimes Ziel, ob du Erfolg hast. Im selben Spiel können mehrere Personen Erfolg haben, und ihre Ziele stehen oft gegeneinander.'],
+          ['Die KI ist nicht von vornherein dein Gegner', '', 'Ob die KI ihr Ziel erreicht, ändert dein Ergebnis nicht. Eine fehlgeleitete KI ist gefährlich, weil sie will, dass der Rat die Kontrolle verliert, nicht weil sie punktet.'],
+        ])}`, 'wide'),
       card('Was die KI will', `
         <p>Eines dieser drei Ziele, zufällig gewählt. Niemand am Tisch weiß, welches, auch die Spielleitung nicht.</p>
         ${objectives(r)}

@@ -106,12 +106,18 @@ export function placementHtml(p) {
   return `
     <table>
       <tr><th></th>${WORLD.map((k) => `<th>${trackName(k)}</th>`).join('')}</tr>
-      ${p.promise ? row(t('Promised for a Full grant'), p.promise) : ''}
+      ${p.promise ? row(promiseLabel(p.promiseFor), p.promise) : ''}
       ${row(p.tokens === 1 ? t('Placed (1 token)') : t('Placed ({n} tokens)', { n: p.tokens }), p.placed)}
     </table>
     ${p.shift ? `<p>${t('The AI shifted one token from {from} to {to}.', names(p.shift))}</p>` : ''}
     ${[].concat(p.moved || []).map((m) => `<p>${t('The council moved one token from {from} to {to}.', names(m))}</p>`).join('')}`;
 }
+
+// What the AI's promise was for: the vote it asked the council for.
+const PROMISED = { full: N('Promised for a Full grant'), conditional: N('Promised for a Conditional grant'), rejected: N('Promised if rejected') };
+export const promiseLabel = (ask) => t(PROMISED[ask] || PROMISED.full);
+// The vote the AI asked for, as a chip.
+export const askChip = (ask) => `<span class="chip ${ask}">${ask === 'rejected' ? t('Reject') : statusName(ask)}</span>`;
 
 // "Race +1, Oversight −1, 3 tokens": what a vote result costs and pays this round.
 export function voteEffect(state, result) {

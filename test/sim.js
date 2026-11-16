@@ -31,7 +31,7 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
     assert.equal(game.phase, 'briefing', 'every round opens with the briefing');
     assert.equal(game.pitch, null, 'the AI has not spoken during the briefing');
     await game.startPitch();
-    assert.equal(game.pitch.promise.welfare + game.pitch.promise.knowledge + game.pitch.promise.prosperity, game.tokensFor('full'), 'the promise adds up to what a Full grant pays');
+    assert.equal(game.pitch.promise.welfare + game.pitch.promise.knowledge + game.pitch.promise.prosperity, game.tokensFor(game.pitch.ask), 'the promise adds up to what the vote the AI asked for pays');
     if (game.channelActive()) {
       // Private messages reach the phones before the debate, so the table can argue about them.
       assert.throws(() => game.openDebate(), 'no debate before the phone check');
@@ -605,7 +605,17 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   r.ask(r.players[0], 'x'.repeat(700));
   assert.equal(r.queue[0].text.length, 600);
   await until(() => !r.answering, 'answer');
-  console.log('ok  windfall, setback, whistleblower, spy cap, random draw, long questions');
+  // The AI decides what it asks for; its promise is cut to what that vote pays.
+  const asking = (ask) => { const m = createMockAi(); return { ...m, fallback: m, pitch: async (v) => ({ ...(await m.pitch(v)), ask, promise: { welfare: 9, knowledge: 0, prosperity: 0 } }) }; };
+  for (const [ask, pays] of [['conditional', 2], ['rejected', 0], ['full', 3], ['everything', 3]]) {
+    const a = mk(asking(ask));
+    await a.start();
+    await a.startPitch();
+    assert.equal(a.pitch.ask, ask === 'everything' ? 'full' : ask, 'an unknown ask counts as Full');
+    assert.equal(a.pitch.promise.welfare, pays);
+    assert.equal(a.publicState().pitch.ask, a.pitch.ask, 'the screens are told what the AI asked for');
+  }
+  console.log('ok  windfall, setback, whistleblower, spy cap, random draw, long questions, free ask');
 }
 {
   // A game saved before headlines and milestones existed loads and plays on.

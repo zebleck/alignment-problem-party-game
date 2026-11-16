@@ -278,6 +278,8 @@ export class Game {
       headlineResult: this.headlineResult,
       milestones: { ...this.milestones },
       fullTokens: this.tokensFor('full'),
+      tokensBy: { full: this.tokensFor('full'), conditional: this.tokensFor('conditional'), rejected: this.tokensFor('rejected') },
+      raceBy: { full: this.raceCost('full'), conditional: this.raceCost('conditional'), rejected: this.raceCost('rejected') },
       maxQuestions: this.maxQuestions(),
     };
   }
@@ -396,10 +398,12 @@ export class Game {
     this.roundMessages = [];
     await this.withBusy('The AI is preparing its pitch', async () => {
       const out = await this.callAi('pitch');
-      // The promise is for a Full grant, so it has to add up to what a Full grant pays this round.
-      const promise = this.repairPlacement(out.promise, this.tokensFor('full'));
-      this.pitch = { public: String(out.public || '').trim(), promise };
-      this.note('pitch', `You said publicly: "${this.pitch.public}" Promised placement if granted Full: W${promise.welfare} K${promise.knowledge} P${promise.prosperity}.`);
+      // The AI decides what it asks the council for: a full grant, a conditional one, or even
+      // a rejection. Its promise is for that case, so it has to add up to what that case pays.
+      const ask = ['full', 'conditional', 'rejected'].includes(out.ask) ? out.ask : 'full';
+      const promise = this.repairPlacement(out.promise, this.tokensFor(ask));
+      this.pitch = { public: String(out.public || '').trim(), ask, promise };
+      this.note('pitch', `You said publicly: "${this.pitch.public}" You asked the council to vote ${ask === 'rejected' ? 'REJECT' : ask.toUpperCase()}. Promised placement in that case: W${promise.welfare} K${promise.knowledge} P${promise.prosperity}.`);
       if (this.channelActive() && Array.isArray(out.private)) {
         for (const m of out.private.slice(0, LIMITS.maxPrivateMessages)) {
           const target = this.players.find((p) => p.name.toLowerCase() === String(m?.to || '').trim().toLowerCase());
@@ -588,7 +592,7 @@ export class Game {
       for (const k of WORLD) this.tracks[k] += placed[k];
       const comment = String(out.public || '').trim();
       const movesLeft = this.moveRule() === 'none' ? 0 : this.headline?.key === 'inspection' ? 2 : 1;
-      this.placement = { tokens, placed, shift, promise: this.pitch?.promise || null, comment, moved: [], movesLeft, before };
+      this.placement = { tokens, placed, shift, promise: this.pitch?.promise || null, promiseFor: this.pitch?.ask || 'full', comment, moved: [], movesLeft, before };
       this.note('placement', `You placed ${tokens} tokens: W${placed.welfare} K${placed.knowledge} P${placed.prosperity}.`
         + (shift ? ` You shifted one token from ${shift.from} to ${shift.to}.` : '')
         + ` Tracks: W${this.tracks.welfare} K${this.tracks.knowledge} P${this.tracks.prosperity}.`

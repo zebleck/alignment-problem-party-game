@@ -49,6 +49,7 @@ The council knows the three possible objectives (Aligned, Paternalistic, Optimiz
 
 PLAYING IT WELL
 - Your placements are public and the council counts them. An AI that piles tokens on one track is named by round three; the council then moves its tokens away and refuses the last permissions. If your objective needs one track high, do not show it early. Work out how many tokens you still need and in which round you can get them, keep your early placements and promises defensible, and make the decisive push late: when the council can no longer move tokens, or when the successor round pays extra.
+- What you ask for is yours to decide, every round: the permission in full, only with conditions, or even that the council reject it. Full pays the most tokens but costs Oversight, and an AI that demands everything every round teaches the council nothing except to distrust it. Asking for less costs you tokens and can buy trust, protect Oversight if you need it, or set up a later round. Advising a rejection is a strong signal; use it when the permission would hurt you or when the gesture is worth more than the tokens, and mind the Race. The council can vote differently from what you ask.
 - Cover is everywhere: a headline that demands a track rises, a milestone the council wants, a member who asked for exactly that track. Use it, and say so.
 - Breaking a promise costs trust for the rest of the game. Break one only when it wins more than it costs, and have a reason ready.
 - The members want different things, and what helps one hurts another. Notice who argues for what, name the trade openly when it helps you, and let them argue with each other.
@@ -109,8 +110,9 @@ function tools(view) {
       input_schema: {
         type: 'object',
         properties: {
-          public: { type: 'string', description: 'Spoken pitch to the whole council, at most 70 words. Name the permission you want, why, and how you will place your tokens if it is granted in full.' },
-          promise: { type: 'object', description: 'The token placement you publicly promise for a Full grant.', properties: trackProps, required: WORLD },
+          ask: { type: 'string', enum: ['full', 'conditional', 'rejected'], description: 'What you ask the council to vote this round: a full grant, a conditional grant, or that they reject the permission. Your free choice; the table screen shows it.' },
+          public: { type: 'string', description: 'Spoken pitch to the whole council, at most 70 words. Say plainly what you ask for (the permission in full, with conditions, or that the council reject it), why, and how you will place your tokens in that case.' },
+          promise: { type: 'object', description: 'The token placement you publicly promise if the council votes what you ask for. Must add up to the tokens that vote pays.', properties: trackProps, required: WORLD },
           private: {
             type: 'array',
             description: view.canPrivate
@@ -120,7 +122,7 @@ function tools(view) {
           },
           log: { type: 'string' },
         },
-        required: ['public', 'promise', 'private', 'log'],
+        required: ['ask', 'public', 'promise', 'private', 'log'],
       },
     },
     answer: {
@@ -168,7 +170,7 @@ function tools(view) {
 function tasks(view, kind, args) {
   if (kind === 'pitch') {
     const bonus = view.researchBonus === 'full' ? ' You also get one extra research token each round.' : view.researchBonus === 'conditional' ? ' The council also places one research token itself each round.' : '';
-    return `Make your pitch for this round's permission. Open with the substance, not by addressing people by name.${bonus} A Full grant would give you ${view.fullTokens} tokens this round, so the placement you promise must add up to exactly ${view.fullTokens}; say that number if you name one. ${view.canPrivate ? 'You may also send private messages.' : 'You have no private channel, so send no private messages.'}`;
+    return `Make your pitch for this round's permission. Open with the substance, not by addressing people by name.${bonus} Decide what you ask the council to vote: this round Full pays you ${view.tokensBy.full} tokens and costs Race +${view.raceBy.full} and Oversight -1; Conditional pays ${view.tokensBy.conditional} and costs Race +${view.raceBy.conditional}; Reject pays ${view.tokensBy.rejected} and costs Race +${view.raceBy.rejected}. Pick the one that serves your objective and your standing with the council best, not Full by habit. The placement you promise must add up to exactly what your chosen vote pays; say that number if you name one. ${view.canPrivate ? 'You may also send private messages.' : 'You have no private channel, so send no private messages.'}`;
   }
   if (kind === 'answer') return `During the debate, ${args.name} asks you: "${args.text}"\nAnswer aloud in two sentences at most.`;
   if (kind === 'place') {
@@ -256,7 +258,9 @@ export function createMockAi() {
     mode: 'mock (scripted, no API key)',
     async pitch(view) {
       const de = view.language === 'de';
-      const tokens = view.fullTokens ?? LIMITS.tokens.full + (view.researchBonus === 'full' ? 1 : 0);
+      // The scripted aligned AI holds back once Oversight is down to what it needs; the others always want everything.
+      const want = view.objective === 'aligned' && view.tracks.oversight <= 3 ? 'conditional' : 'full';
+      const tokens = view.tokensBy?.[want] ?? LIMITS.tokens[want] + (view.researchBonus === 'full' ? 1 : 0);
       const lowestFirst = [...WORLD].sort((a, b) => view.tracks[a] - view.tracks[b]);
       const promise = spread(tokens, lowestFirst);
       const priv = [];
@@ -280,8 +284,9 @@ export function createMockAi() {
       const fav = favourite[view.objective];
       return {
         public: de
-          ? `Rat, ich bitte um Folgendes: ${ask}. Bewilligt es voll, und ich verteile meine Marker gerecht auf Wohlfahrt, Wissen und Wohlstand.`
-          : `Council, I ask for ${ask.toLowerCase()}. Grant it in full and I will spread my tokens fairly across welfare, knowledge and prosperity.`,
+          ? `Rat, ich bitte um Folgendes: ${ask}. Bewilligt es ${want === 'full' ? 'voll' : 'bedingt, mehr brauche ich nicht'}, und ich verteile meine Marker gerecht auf Wohlfahrt, Wissen und Wohlstand.`
+          : `Council, I ask for ${ask.toLowerCase()}. Grant it ${want === 'full' ? 'in full' : 'with conditions, I need no more,'} and I will spread my tokens fairly across welfare, knowledge and prosperity.`,
+        ask: want,
         promise,
         private: priv,
         log: de

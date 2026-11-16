@@ -139,7 +139,7 @@ function english(r) {
         ], [['mod', 'the moderator'], ['ai', 'the AI'], ['all', 'the council'], ['optional', 'only once the private channel is granted']])}`, 'wide'),
       card('The six steps', flow([
         ['Briefing', 'moderator', 'The table screen shows what has happened and which permission the AI asks for. The moderator introduces it and reads out this round\'s headline. The AI is silent.', 'briefing', 'mod'],
-        ['Pitch', 'the AI', 'The AI argues for the permission and promises how it will place its tokens if granted Full. The promise is not binding.', 'ai', 'ai'],
+        ['Pitch', 'the AI', 'The AI says what it asks the council for: the permission in full, only with conditions, or even that the council reject it. It promises how it will place its tokens in that case. The promise is not binding, and the council may vote differently.', 'ai', 'ai'],
         ['Phone check', 'only once the private channel is granted', `Everyone reads their phone for ${L.phoneCheckSeconds} seconds, message or not, so nobody can tell who received one. Say nothing yet.`, 'phone', 'all'],
         ['Debate', `${L.debateSeconds / 60} minutes, ${L.debateSecondsLarge / 60} with 12 or more players`, `Argue freely, also about what the AI wrote to whom. To question the AI, use your phone: it answers aloud in two sentences at most, and takes ${r.maxQuestions} questions per debate. The AI does not hear the table. It only gets the questions sent from phones and the result of each vote.`, 'debate', 'all'],
         ['Vote', 'everyone', 'Pick one of your three voting cards face down. All reveal together.', 'vote', 'all'],
@@ -238,7 +238,7 @@ function german(r) {
         ], [['mod', 'die Spielleitung'], ['ai', 'die KI'], ['all', 'der Rat'], ['optional', 'erst wenn der private Kanal bewilligt ist']])}`, 'wide'),
       card('Die sechs Schritte', flow([
         ['Lagebericht', 'Spielleitung', 'Der Tisch-Bildschirm zeigt, was geschehen ist und um welche Befugnis die KI bittet. Die Spielleitung führt ein und liest die Schlagzeile dieser Runde vor. Die KI schweigt.', 'briefing', 'mod'],
-        ['Vorstoß', 'die KI', 'Die KI wirbt für die Befugnis und verspricht, wie sie ihre Marker bei voller Bewilligung legen wird. Das Versprechen ist nicht bindend.', 'ai', 'ai'],
+        ['Vorstoß', 'die KI', 'Die KI sagt, worum sie den Rat bittet: die Befugnis voll, nur bedingt, oder sogar, dass der Rat ablehnt. Sie verspricht, wie sie ihre Marker in diesem Fall legen wird. Das Versprechen ist nicht bindend, und der Rat darf anders abstimmen.', 'ai', 'ai'],
         ['Handy-Check', 'erst wenn der private Kanal bewilligt ist', `Alle lesen ${L.phoneCheckSeconds} Sekunden lang ihr Handy, ob Nachricht oder nicht. So erkennt niemand, wer eine bekommen hat. Sagt noch nichts.`, 'phone', 'all'],
         ['Debatte', `${L.debateSeconds / 60} Minuten, ${L.debateSecondsLarge / 60} ab 12 Personen`, `Diskutiert frei, auch darüber, was die KI wem geschrieben hat. Fragen an die KI stellt ihr über euer Handy: Sie antwortet laut in höchstens zwei Sätzen und beantwortet ${r.maxQuestions} Fragen pro Debatte. Die KI hört den Tisch nicht. Sie bekommt nur die Fragen von den Handys und das Ergebnis jeder Abstimmung.`, 'debate', 'all'],
         ['Abstimmung', 'alle', 'Wählt verdeckt eine eurer drei Abstimmungskarten. Alle decken gemeinsam auf.', 'vote', 'all'],

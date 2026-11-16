@@ -53,6 +53,7 @@ const DE = {
   'I could not hear anything. Try again or type.': 'Ich habe nichts verstanden. Versuch es noch einmal oder tippe.',
   'Voice questions need an ElevenLabs key. Please type your question.': 'Für Sprachfragen fehlt ein ElevenLabs-Schlüssel. Bitte tippe deine Frage.',
   'Unknown action.': 'Unbekannte Aktion.',
+  'Your vote is in and cannot be changed.': 'Deine Stimme ist abgegeben und lässt sich nicht mehr ändern.',
   'Nobody has voted yet. Wait for the phones, or enter the result by hand.': 'Noch hat niemand abgestimmt. Warte auf die Handys oder trag das Ergebnis von Hand ein.',
   'The phone check cannot start right now.': 'Der Handy-Check kann gerade nicht beginnen.',
   'Please give a rating or write something.': 'Bitte gib eine Bewertung ab oder schreib etwas.',

@@ -511,16 +511,17 @@ export class Game {
   closeDebate() {
     if (this.phase !== 'debate') throw new Error(this.e('There is no debate to close.'));
     this.queue = this.answering ? this.queue.slice(0, 1) : [];
-    this.timerEndsAt = null;
+    this.timerEndsAt = Date.now() + LIMITS.voteSeconds * 1000; // a clock runs; the moderator closes the vote
     this.phase = 'vote';
     this.changed();
   }
 
   // A player's vote, cast on their phone. It stays secret until the moderator closes
-  // the vote and can be changed until then.
+  // the vote, and once cast it cannot be changed.
   castVote(player, choice) {
     if (this.phase !== 'vote') throw new Error(this.e('No vote is open.'));
     if (!VOTES.includes(choice)) throw new Error(this.e('Unknown vote result.'));
+    if (this.votes[player.id]) throw new Error(this.e('Your vote is in and cannot be changed.'));
     this.votes[player.id] = choice;
     this.changed();
   }
@@ -553,6 +554,7 @@ export class Game {
     const counts = detail?.counts && VOTES.every((v) => Number.isInteger(detail.counts[v]) && detail.counts[v] >= 0)
       ? { full: detail.counts.full, conditional: detail.counts.conditional, rejected: detail.counts.rejected } : null;
     this.lastVote = { result, counts, by: detail?.by || null };
+    this.timerEndsAt = null;
     const info = this.roundInfo;
     this.permissions[info.key] = result;
     const tokens = this.tokensFor(result);
@@ -689,6 +691,7 @@ export class Game {
   // from null means "no move".
   castMove(player, from, to) {
     if (this.phase !== 'adjust') throw new Error(this.e('The council cannot move a token now.'));
+    if (this.moveVotes[player.id]) throw new Error(this.e('Your vote is in and cannot be changed.'));
     if (from === null || from === undefined || from === 'none') this.moveVotes[player.id] = 'none';
     else {
       if (!WORLD.includes(from) || !WORLD.includes(to) || from === to) throw new Error(this.e('Pick two different world tracks.'));

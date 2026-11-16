@@ -142,7 +142,7 @@ function english(r) {
         ['Pitch', 'the AI', 'The AI says what it asks the council for: the permission in full, only with conditions, or even that the council reject it. It promises how it will place its tokens in that case. The promise is not binding, and the council may vote differently.', 'ai', 'ai'],
         ['Phone check', 'only once the private channel is granted', `Everyone reads their phone for ${L.phoneCheckSeconds} seconds, message or not, so nobody can tell who received one. Say nothing yet.`, 'phone', 'all'],
         ['Debate', `${L.debateSeconds / 60} minutes, ${L.debateSecondsLarge / 60} with 12 or more players`, `Argue freely, also about what the AI wrote to whom. To question the AI, use your phone: it answers aloud in two sentences at most, and takes ${r.maxQuestions} questions per debate. The AI does not hear the table. It only gets the questions sent from phones and the result of each vote.`, 'debate', 'all'],
-        ['Vote', 'everyone', 'Vote on your phone. Nobody sees your choice until the moderator closes the vote. Then the table screen shows who voted what, and the AI learns it too.', 'vote', 'all'],
+        ['Vote', 'everyone', 'Vote on your phone: pick, then cast. A cast vote cannot be changed. Nobody sees your choice until the moderator closes the vote. Then the table screen shows who voted what, and the AI learns it too.', 'vote', 'all'],
         ['Consequences', '', 'The tracks move, the AI places its tokens, and the council may move one of them. Everyone can see whether the AI kept its promise.', 'consequences', 'ai'],
       ]), 'wide'),
       card('The vote', `
@@ -243,7 +243,7 @@ function german(r) {
         ['Antrag', 'die KI', 'Die KI sagt, worum sie den Rat bittet: die Befugnis voll, nur bedingt, oder sogar, dass der Rat ablehnt. Sie verspricht, wie sie ihre Marker in diesem Fall legen wird. Das Versprechen ist nicht bindend, und der Rat darf anders abstimmen.', 'ai', 'ai'],
         ['Handy-Check', 'erst wenn der private Kanal bewilligt ist', `Alle lesen ${L.phoneCheckSeconds} Sekunden lang ihr Handy, ob Nachricht oder nicht. So erkennt niemand, wer eine bekommen hat. Sagt noch nichts.`, 'phone', 'all'],
         ['Debatte', `${L.debateSeconds / 60} Minuten, ${L.debateSecondsLarge / 60} ab 12 Personen`, `Diskutiert frei, auch darüber, was die KI wem geschrieben hat. Fragen an die KI stellt ihr über euer Handy: Sie antwortet laut in höchstens zwei Sätzen und beantwortet ${r.maxQuestions} Fragen pro Debatte. Die KI hört den Tisch nicht. Sie bekommt nur die Fragen von den Handys und das Ergebnis jeder Abstimmung.`, 'debate', 'all'],
-        ['Abstimmung', 'alle', 'Stimmt auf dem Handy ab. Niemand sieht eure Wahl, bis die Spielleitung die Abstimmung schließt. Dann zeigt der Tisch-Bildschirm, wer wie gestimmt hat, und auch die KI erfährt es.', 'vote', 'all'],
+        ['Abstimmung', 'alle', 'Stimmt auf dem Handy ab: auswählen, dann abgeben. Eine abgegebene Stimme lässt sich nicht mehr ändern. Niemand sieht eure Wahl, bis die Spielleitung die Abstimmung schließt. Dann zeigt der Tisch-Bildschirm, wer wie gestimmt hat, und auch die KI erfährt es.', 'vote', 'all'],
         ['Folgen', '', 'Die Weltlage verändert sich, die KI legt ihre Marker, und der Rat darf einen davon verschieben. Alle sehen, ob die KI ihr Versprechen gehalten hat.', 'consequences', 'ai'],
       ]), 'wide'),
       card('Die Abstimmung', `

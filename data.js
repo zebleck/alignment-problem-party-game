@@ -12,6 +12,7 @@ export const LIMITS = {
   debateSeconds: 180,
   debateSecondsLarge: 240, // 12+ players
   phoneCheckSeconds: 15,
+  voteSeconds: 30, // time on the clock for the vote on the permission
   moveSeconds: 60, // time on the clock for the council's vote on moving a token
   takeover: 8, // a misaligned AI with its own track at this level at the end has taken over quietly
   questionChars: 600, // a spoken question runs longer than a typed one

@@ -178,7 +178,7 @@ function actionsHtml(s) {
         <p class="muted">${t('In the debate, anyone may reveal their message, keep it secret, or lie about it.')}</p>
         <div class="actions"><button class="primary" onclick="act('openDebate')">${t('Open debate')}</button></div>`;
     case 'vote':
-      return `<p>${t('Everyone votes on their phone. Close the vote when all are in.')} <b>${t('{n} of {total} have voted', { n: s.votesCast || 0, total: s.players.length })}</b></p>
+      return `<p>${t('Everyone votes on their phone. Close the vote when all are in.')} <b>${t('{n} of {total} have voted', { n: s.votesCast || 0, total: s.players.length })}</b> <b class="mono" id="modTimer"></b></p>
         <p class="muted">${t('Still missing:')} ${s.players.filter((p) => !p.voted).map((p) => esc(p.name)).join(', ') || '–'}</p>
         <div class="actions"><button class="primary" onclick="act('closeVote')" ${s.votesCast ? '' : 'disabled'}>${t('Close the vote and reveal')}</button></div>
         <details class="by-hand" ${byHandOpen ? 'open' : ''} ontoggle="byHand(this.open)"><summary class="muted">${t('Enter the result by hand (if phones fail)')}</summary>

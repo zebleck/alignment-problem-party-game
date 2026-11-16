@@ -254,6 +254,9 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
     assert.equal(screen.state.lastVote, null, 'no result before the vote is closed');
     assert.ok(!JSON.stringify(screen.state.players).includes(votes[round - 1]), 'the screen only knows who has voted, not what');
     assert.equal(players[0].state.me.vote, votes[round - 1], 'a player sees their own vote');
+    players[0].send({ type: 'vote', choice: 'rejected' });
+    await until(() => players[0].errors.length === round, 'a second vote is refused');
+    assert.equal(mod.state.timerEndsAt > 0, true, 'a clock runs for the vote');
     act('closeVote');
     await until(() => ['adjust', 'roundend'].includes(mod.state.phase) && !mod.state.busy, 'placement done');
     if (mod.state.phase === 'adjust') act('skipMove');
@@ -689,11 +692,11 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   await toVote(g);
   assert.throws(() => g.castVote(g.players[0], 'maybe'));
   await assert.rejects(() => g.closeVote(), 'nothing to count yet');
-  const cast = (list) => list.forEach((v, i) => { if (v) g.castVote(g.players[i], v); });
+  const cast = (list) => { g.votes = {}; list.forEach((v, i) => { if (v) g.castVote(g.players[i], v); }); };
+  assert.ok(g.timerEndsAt > Date.now(), 'a clock runs for the vote');
   cast(['full', 'full', 'conditional', 'conditional', 'rejected', null]); // Full 2, Conditional 2: a tie goes to Conditional
   assert.deepEqual(g.tally(), { counts: { full: 2, conditional: 2, rejected: 1 }, result: 'conditional', cast: 5 });
-  g.castVote(g.players[2], 'full'); // a vote can be changed until the vote is closed
-  assert.equal(g.tally().result, 'full');
+  assert.throws(() => g.castVote(g.players[2], 'full'), /cannot be changed/, 'a cast vote is final');
   cast(['rejected', 'rejected', 'full', 'full', 'conditional', null]); // 3 for, 2 against: granted
   assert.equal(g.tally().result, 'full');
   cast(['rejected', 'rejected', 'rejected', 'full', 'conditional', null]); // 2 for, 3 against: not granted
@@ -715,7 +718,7 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   // By hand: with the card counts typed the AI gets the counts, otherwise only the result.
   await g.vote('conditional', { counts: { full: 1, conditional: 4, rejected: 1 } });
   assert.match(g.history.find((h) => h.kind === 'vote').text, /Counted: 1 Full, 4 Conditional, 1 Reject./);
-  console.log('ok  phone voting: tally, ties, changing a vote, names for the AI, undo, by hand');
+  console.log('ok  phone voting: tally, ties, a cast vote is final, names for the AI, undo, by hand');
 }
 {
   // Moving a token is voted on the phones: it happens only if enough votes name the same move.
@@ -728,16 +731,15 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   assert.throws(() => g.closeMoves(), 'nothing to count yet');
   assert.throws(() => g.castMove(g.players[0], 'welfare', 'welfare'));
   const P = g.players;
-  // Split: two different moves and a "no move" among five votes. Nothing gets more than half.
+  // Three of five name the same move: it happens.
   g.castMove(P[0], 'welfare', 'knowledge');
   g.castMove(P[1], 'welfare', 'knowledge');
-  g.castMove(P[2], 'welfare', 'prosperity');
+  g.castMove(P[2], 'welfare', 'knowledge');
   g.castMove(P[3], 'prosperity', 'knowledge');
   g.castMove(P[4], null);
   assert.equal(g.publicState().movesCast, 5);
   assert.equal(g.playerState(P[0]).me.move, 'welfare>knowledge');
-  // One changes their mind: now three of five name the same move.
-  g.castMove(P[2], 'welfare', 'knowledge');
+  assert.throws(() => g.castMove(P[0], null), /cannot be changed/, 'a cast vote is final');
   g.closeMoves();
   assert.deepEqual([g.tracks.welfare, g.tracks.knowledge], [0, 2]);
   assert.equal(g.phase, 'adjust', 'the inspection leaves a second move open');
@@ -770,7 +772,7 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   g.closeMoves();
   assert.equal(g.tracks.welfare, before.welfare, 'three of five is not two thirds');
   assert.equal(g.phase, 'roundend');
-  console.log('ok  token moves voted on the phones: split, majority, second move, two thirds');
+  console.log('ok  token moves voted on the phones: majority, second move, split, two thirds, final votes');
 }
 {
   // The members' objectives reach the AI only if the private channel is granted in full.

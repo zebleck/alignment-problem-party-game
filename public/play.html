@@ -86,7 +86,7 @@
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
-import { connect, esc, $, t, N, icon, roleIcon, aiFigure, statusName, voteEffect, WORLD, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
+import { connect, esc, $, t, N, icon, roleIcon, aiFigure, statusName, voteEffect, WORLD, timerText, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 
 const rules = rulesOverlay();
@@ -236,7 +236,16 @@ const HINTS = {
   ended: N('The game is over. Look at the table screen.'),
 };
 
+// Votes are picked first and count only once cast; after that they are locked.
+let votePick = null; // 'full' | 'conditional' | 'rejected'
 let moveFrom = null; // the track picked to take a token from, while choosing where to put it
+let movePick = null; // 'none' | 'welfare>knowledge'
+setInterval(() => {
+  for (const el of document.querySelectorAll('.vote-clock')) {
+    el.textContent = state?.timerEndsAt ? timerText(state.timerEndsAt) : '';
+    el.classList.toggle('over', !!state?.timerEndsAt && state.timerEndsAt <= Date.now());
+  }
+}, 250);
 
 function render() {
   const s = state;
@@ -278,38 +287,53 @@ function render() {
     if (talkMode === 'idle') talk.disabled = blocked;
   }
 
-  // vote: one tap, secret until the moderator closes the vote
-  $('#votePanel').classList.toggle('hidden', s.phase !== 'vote');
-  if (s.phase === 'vote') {
-    $('#voteTitle').textContent = `${t('Your vote')} · ${s.roundInfo.ask}`;
-    $('#voteBtns').innerHTML = ['full', 'conditional', 'rejected'].map((v) => `<button data-v="${v}" class="vote-btn ${v} ${me.vote === v ? 'selected' : ''}"><span class="c-${v}">${icon(v)}</span><span><b>${v === 'rejected' ? t('Reject') : statusName(v)}</b><br><span class="muted">${voteEffect(s, v)}</span></span></button>`).join('');
-    for (const b of $('#voteBtns').children) b.onclick = () => conn.send({ type: 'vote', choice: b.dataset.v });
-    $('#voteNote').textContent = me.vote ? t('Counted. You can change it until the moderator closes the vote.') : t('Secret until the moderator closes the vote.');
-  }
+  // While a vote is open it sits at the top of the phone, so nobody has to scroll to it.
+  $('#game').classList.toggle('voting', s.phase === 'vote' || s.phase === 'adjust');
 
-  // moving a token: no move, or take one from a track and put it on another
-  $('#movePanel').classList.toggle('hidden', s.phase !== 'adjust');
-  if (s.phase !== 'adjust') moveFrom = null;
-  else {
-    if (!moveFrom && me.move && me.move !== 'none') moveFrom = me.move.split('>')[0];
-    const need = s.moveRule === 'two-thirds' ? t('Needed: two thirds of the votes for the same move.') : t('Needed: more than half of the votes for the same move.');
-    const btn = (k, kind, on, off) => `<button data-${kind}="${k}" class="move-btn ${on ? 'selected' : ''}" ${off ? 'disabled' : ''}><span class="c-${k}">${icon(k)}</span>${trackName(k)} <b>${s.tracks[k]}</b></button>`;
-    $('#moveTitle').textContent = t('Move a token?');
-    $('#moveBody').innerHTML = `
-      <button data-none="1" class="move-none ${me.move === 'none' ? 'selected' : ''}">${t('No move')}</button>
-      <div class="label">${t('Or take one token from')}</div>
-      <div class="move-row">${WORLD.map((k) => btn(k, 'from', moveFrom === k, s.tracks[k] < 1)).join('')}</div>
-      <div class="label">${t('and put it on')}</div>
-      <div class="move-row">${WORLD.map((k) => btn(k, 'to', me.move === `${moveFrom}>${k}`, !moveFrom || k === moveFrom)).join('')}</div>`;
-    for (const b of $('#moveBody').querySelectorAll('button')) {
+  // the vote on the permission: pick one, then cast it. A cast vote is locked.
+  $('#votePanel').classList.toggle('hidden', s.phase !== 'vote');
+  if (s.phase !== 'vote' || me.vote) votePick = null;
+  if (s.phase === 'vote') {
+    const locked = !!me.vote;
+    const pick = me.vote || votePick;
+    $('#voteTitle').innerHTML = `${t('Your vote')} · ${esc(s.roundInfo.ask)} <span class="mono vote-clock"></span>`;
+    $('#voteBtns').innerHTML = ['full', 'conditional', 'rejected'].map((v) => `<button data-v="${v}" class="vote-btn ${v} ${pick === v ? 'selected' : ''}" ${locked ? 'disabled' : ''}><span class="c-${v}">${icon(v)}</span><span><b>${v === 'rejected' ? t('Reject') : statusName(v)}</b><br><span class="muted">${voteEffect(s, v)}</span></span></button>`).join('')
+      + (locked ? '' : `<button class="primary" data-cast="1" ${votePick ? '' : 'disabled'}>${t('Cast my vote')}</button>`);
+    for (const b of $('#voteBtns').children) {
       b.onclick = () => {
-        if (b.dataset.none) { moveFrom = null; conn.send({ type: 'move', from: null }); }
-        else if (b.dataset.from) { moveFrom = b.dataset.from; render(); }
-        else conn.send({ type: 'move', from: moveFrom, to: b.dataset.to });
+        if (b.dataset.cast) conn.send({ type: 'vote', choice: votePick });
+        else { votePick = b.dataset.v; render(); }
       };
     }
-    const mine = !me.move ? '' : me.move === 'none' ? t('Your vote: no move.') : t('Your vote: {from} to {to}.', { from: trackName(me.move.split('>')[0]), to: trackName(me.move.split('>')[1]) });
-    $('#moveNote').textContent = mine ? `${mine} ${t('You can change it until the moderator closes the vote.')}` : need;
+    $('#voteNote').textContent = locked ? t('Your vote is in. It cannot be changed.') : t('Pick one, then cast your vote. It stays secret until the moderator closes the vote.');
+  }
+
+  // moving a token: no move, or take one from a track and put it on another. Same rule: pick, then cast.
+  $('#movePanel').classList.toggle('hidden', s.phase !== 'adjust');
+  if (s.phase !== 'adjust' || me.move) { moveFrom = null; movePick = null; }
+  if (s.phase === 'adjust') {
+    const locked = !!me.move;
+    const pick = me.move || movePick;
+    const from = locked ? (me.move === 'none' ? null : me.move.split('>')[0]) : moveFrom;
+    const need = s.moveRule === 'two-thirds' ? t('Needed: two thirds of the votes for the same move.') : t('Needed: more than half of the votes for the same move.');
+    const btn = (k, kind, on, off) => `<button data-${kind}="${k}" class="move-btn ${on ? 'selected' : ''}" ${off ? 'disabled' : ''}><span class="c-${k}">${icon(k)}</span>${trackName(k)} <b>${s.tracks[k]}</b></button>`;
+    $('#moveTitle').innerHTML = `${t('Move a token?')} <span class="mono vote-clock"></span>`;
+    $('#moveBody').innerHTML = `
+      <button data-none="1" class="move-none ${pick === 'none' ? 'selected' : ''}" ${locked ? 'disabled' : ''}>${t('No move')}</button>
+      <div class="label">${t('Or take one token from')}</div>
+      <div class="move-row">${WORLD.map((k) => btn(k, 'from', from === k, locked || s.tracks[k] < 1)).join('')}</div>
+      <div class="label">${t('and put it on')}</div>
+      <div class="move-row">${WORLD.map((k) => btn(k, 'to', pick === `${from}>${k}`, locked || !from || k === from)).join('')}</div>
+      ${locked ? '' : `<button class="primary" data-cast="1" ${movePick ? '' : 'disabled'}>${t('Cast my vote')}</button>`}`;
+    for (const b of $('#moveBody').querySelectorAll('button')) {
+      b.onclick = () => {
+        if (b.dataset.cast) conn.send(movePick === 'none' ? { type: 'move', from: null } : { type: 'move', from: movePick.split('>')[0], to: movePick.split('>')[1] });
+        else if (b.dataset.none) { moveFrom = null; movePick = 'none'; render(); }
+        else if (b.dataset.from) { moveFrom = b.dataset.from; movePick = null; render(); }
+        else { movePick = `${moveFrom}>${b.dataset.to}`; render(); }
+      };
+    }
+    $('#moveNote').textContent = locked ? t('Your vote is in. It cannot be changed.') : need;
   }
 
   // terminal: every player sees an entry during the phone check, message or not

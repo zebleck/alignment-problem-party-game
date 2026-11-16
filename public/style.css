@@ -715,3 +715,12 @@ body.table .screen .row > .ai-box { flex: 1 1 22em; min-width: 0; }
 .proposals { margin: 0.6em 0; }
 .proposal { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3em 0.8em; padding: 0.35em 0; border-top: 1px solid var(--line); }
 .proposal .tag { font-weight: 600; }
+
+/* While a vote is open it comes first on the phone; what is not needed for it steps aside. */
+#game.voting .topline { order: -2; }
+#game.voting #votePanel, #game.voting #movePanel { order: -1; }
+#game.voting #hint, #game.voting #history, #game.voting #rulesBtn { display: none; }
+.vote-btn.selected:disabled, .move-btn.selected:disabled, .move-none.selected:disabled { opacity: 1; }
+.vote-clock { float: right; font-size: 1.5em; letter-spacing: 0; color: var(--ai); }
+.vote-clock.over { color: var(--bad); }
+#voteBtns .primary, #moveBody .primary { width: 100%; margin-top: 4px; }

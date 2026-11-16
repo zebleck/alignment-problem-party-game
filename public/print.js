@@ -135,20 +135,20 @@ function cheatDe(r) {
           <li>Server und Tunnel starten. Den <b>Tisch-Bildschirm</b> auf dem Fernseher öffnen und <b>Ton einschalten</b> klicken.</li>
           <li>Den <b>Link der Spielleitung</b> auf dem eigenen Gerät öffnen. Sprache wählen. <b>Stimme testen</b>.</li>
           <li>Alle scannen den Code und geben ihren Namen ein. Handys lautlos und umgedreht.</li>
-          <li>Abgestimmt wird auf den Handys. Die Abstimmungskarten sind nur Ersatz.</li>
+          <li>Abgestimmt wird auf den Handys; die Karten sind Ersatz.</li>
           <li>Du bist neutral: Du spielst und stimmst nicht mit und siehst das Ziel der KI nie.</li>
           <li>Das Spiel in einer Minute erklären (Regeln am Tisch-Bildschirm zeigen), dann <b>Spiel starten</b>.</li>
         </ul>
       </div>
       <div>
         <h2>Abstimmung auszählen</h2>
-        <p>Alle stimmen auf dem Handy ab. Sind alle fertig, die Abstimmung schließen: Die Konsole zählt, und der Tisch-Bildschirm zeigt, wer wie gestimmt hat.</p>
+        <p>Alle stimmen auf dem Handy ab. Dann schließen: Die Konsole zählt, der Bildschirm zeigt, wer wie gestimmt hat.</p>
         <ul>
           <li><b>Bewilligt</b>, wenn Voll + Bedingt zusammen mehr sind als Ablehnen.</li>
           <li>Falls bewilligt: <b>Voll</b> nur, wenn Voll mehr Karten hat als Bedingt, sonst <b>Bedingt</b>.</li>
           <li>Bei Gleichstand gilt die vorsichtigere Option.</li>
         </ul>
-        <p>Fallen Handys aus: mit den Karten abstimmen und die drei Zahlen von Hand eintragen.</p>
+        <p>Ohne Handys: Karten, die drei Zahlen von Hand eintragen.</p>
       </div>
     </div>
 
@@ -159,7 +159,7 @@ function cheatDe(r) {
       <tr><td><b>1 Vorstoß</b></td><td>Die KI macht ihren Vorstoß und verspricht eine Marker-Verteilung.</td><td>Nichts. Die KI hat das Wort.</td><td>Handy-Check oder Debatte eröffnen</td></tr>
       <tr><td><b>2 Handy-Check</b><br>sobald der private Kanal bewilligt ist</td><td>Jedes Handy zeigt einen Terminal-Eintrag, ob Nachricht oder nicht.</td><td>„Prüft eure Terminals.“ ${L.phoneCheckSeconds} Sekunden warten. Erscheint am Bildschirm eine offengelegte Nachricht, lies sie vor.</td><td>Debatte eröffnen</td></tr>
       <tr><td><b>3 Debatte</b><br>${L.debateSeconds / 60} Min. (${L.debateSecondsLarge / 60} ab 12)</td><td>Der Tisch diskutiert. Fragen an die KI kommen über die Handys, höchstens ${r.maxQuestions} pro Runde.</td><td>„Die Debatte ist eröffnet.“ Bei 0:00: „Letzte Worte.“ Die Uhr beendet die Debatte nicht; das machst du.</td><td>Debatte schließen</td></tr>
-      <tr><td><b>4 Abstimmung</b></td><td>Alle stimmen geheim auf dem Handy ab.</td><td>„Stimmt jetzt ab.“ Sind alle fertig: „Drei, zwei, eins.“</td><td>Abstimmung schließen und aufdecken</td></tr>
+      <tr><td><b>4 Abstimmung</b></td><td>Alle stimmen geheim auf dem Handy ab.</td><td>„Stimmt jetzt ab.“</td><td>Abstimmung schließen</td></tr>
       <tr><td><b>5 Forschungsmarker</b><br>nur wenn die Forschung bedingt bewilligt ist</td><td>Der Rat bestimmt einen Fortschritt.</td><td>„Auf welchen Fortschritt kommt der Forschungsmarker?“ Schnelle Mehrheit.</td><td>Der Fortschritt</td></tr>
       <tr><td><b>6 Marker legen</b></td><td>Die KI legt ihre Marker und kommentiert.</td><td>Auf Versprechen und tatsächliche Verteilung hinweisen.</td><td></td></tr>
       <tr><td><b>7 Korrektur</b></td><td>Der Rat darf einen Marker verschieben (Mehrheit, später Zweidrittel, später gar nicht).</td><td>„Schlägt jemand eine Verschiebung vor?“ Ein Vorschlag, eine Abstimmung.</td><td>Marker verschieben oder Nicht verschieben</td></tr>

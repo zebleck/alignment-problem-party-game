@@ -80,7 +80,7 @@ export function tracksHtml(state) {
   const scale = Math.max(10, tr.welfare, tr.knowledge, tr.prosperity);
   // Each world track pays the council once, the first time it reaches the milestone.
   const at = state.limits.milestone;
-  const bonus = { welfare: t('next Reject: Race −1'), knowledge: t('+1 question per debate'), prosperity: t('Race −1') };
+  const bonus = { welfare: t('next Reject: Race −1'), knowledge: t('Oversight +1'), prosperity: t('Race −1') };
   const paid = state.milestones || {};
   const bar = (k) => `
     <div class="track ${k}">

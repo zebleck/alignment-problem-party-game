@@ -81,7 +81,6 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
   assert.equal(t.race, 4);
   assert.equal(t.oversight, 5);
   assert.deepEqual(g.milestones, { welfare: true, prosperity: true });
-  assert.equal(g.maxQuestions(), 3, 'no extra question without the Knowledge milestone');
   // 5 x 2 tokens + 2 successor bonus + 4 council research tokens
   assert.equal(t.welfare + t.knowledge + t.prosperity, 16);
   // Welfare ends at 9 with a paternalistic AI: a quiet takeover. The council kept its vote and still lost.
@@ -115,9 +114,9 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
   const g = await playDirect({ objective: 'aligned', votes: ['full', 'conditional', 'conditional', 'conditional', 'full'] });
   assert.equal(g.result.ending, 'flourishing');
   assert.equal(g.result.aiWins, true);
-  // Two Full grants take Oversight from 5 to 3, and no milestone gives it back.
-  assert.equal(g.result.tracks.oversight, 3);
-  assert.equal(g.maxQuestions(), 4, 'the Knowledge milestone adds a question to every debate');
+  // Two Full grants take Oversight from 5 to 3; Knowledge reaching 4 gives one back.
+  assert.equal(g.result.tracks.oversight, 4);
+  assert.ok(g.milestones.knowledge);
   console.log('ok  aligned + Full  ->', g.result.ending, g.result.tracks);
 }
 {
@@ -130,9 +129,9 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
 }
 {
   // Four Full grants drop Oversight to 1: disempowered even without the successor.
-  // (The council moves tokens off Welfare, so its milestone never gives Oversight back.)
-  const g = await playDirect({ objective: 'optimizer', votes: ['full', 'full', 'full', 'full', 'conditional'], move: true });
-  assert.ok(!g.milestones.welfare);
+  // (A paternalistic AI keeps Knowledge below 4, so that milestone never gives Oversight back.)
+  const g = await playDirect({ objective: 'paternalistic', votes: ['full', 'full', 'full', 'full', 'conditional'] });
+  assert.ok(!g.milestones.knowledge);
   assert.equal(g.result.tracks.oversight, 1);
   assert.equal(g.result.ending, 'disempowered');
   console.log('ok  Oversight 1     ->', g.result.ending);
@@ -704,6 +703,18 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   g.tracks.welfare = 4;
   g.checkMilestones();
   assert.equal(g.tracks.oversight, 5, 'Welfare no longer gives Oversight back');
+  // Knowledge does: a Parliamentarian who is out after two Full grants is back in once it reaches 4.
+  const { ROLES: R } = await import('../data.js');
+  const parliament = R.find((x) => x.key === 'parliamentarian').check;
+  g.tracks.oversight = 3;
+  assert.equal(parliament(g.tracks), false);
+  g.tracks.knowledge = 4;
+  g.checkMilestones();
+  assert.equal(g.tracks.oversight, 4);
+  assert.equal(parliament(g.tracks), true);
+  g.tracks.knowledge = 3; g.tracks.knowledge = 4; g.checkMilestones();
+  assert.equal(g.tracks.oversight, 4, 'only once');
+  g.tracks.oversight = 5;
   assert.deepEqual(['full', 'conditional', 'rejected'].map((v) => g.raceCost(v)), [0, 1, 1]);
   await toVote(g);
   await g.vote('rejected');

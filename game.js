@@ -228,7 +228,7 @@ export class Game {
   }
 
   maxQuestions() {
-    return this.config.maxQuestions + (this.milestones.knowledge ? 1 : 0);
+    return this.config.maxQuestions;
   }
 
   // The first time a world track reaches the milestone, the council is paid once.
@@ -236,6 +236,7 @@ export class Game {
     for (const k of WORLD) {
       if (this.milestones[k] || this.tracks[k] < LIMITS.milestone) continue;
       this.milestones[k] = true;
+      if (k === 'knowledge') this.tracks.oversight += 1;
       if (k === 'prosperity') this.tracks.race = Math.max(0, this.tracks.race - 1);
       this.note('milestone', `${k} reached ${LIMITS.milestone} for the first time. The council gains: ${MILESTONES[k]}. Race is now ${this.tracks.race}, Oversight ${this.tracks.oversight}.`);
     }

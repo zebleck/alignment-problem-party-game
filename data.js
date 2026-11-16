@@ -22,11 +22,12 @@ export const LIMITS = {
 };
 
 // What the council gets the first time a world track reaches LIMITS.milestone.
-// Welfare: the next Reject costs 1 less Race. Knowledge: one more question per debate. Prosperity: Race -1.
+// Welfare: the next Reject costs 1 less Race. Knowledge: Oversight +1 (understanding the AI is
+// what lets the council watch it). Prosperity: Race -1.
 // (Welfare used to give Oversight +1, which cancelled the one cost of a Full grant.)
 export const MILESTONES = {
   welfare: 'the next Reject raises Race by 1 less',
-  knowledge: 'one more question to the AI in every debate',
+  knowledge: 'Oversight +1',
   prosperity: 'Race -1',
 };
 

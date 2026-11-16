@@ -53,7 +53,7 @@ Both were added after the first full game (November 2026), whose players found i
 
 - **Headlines.** Ten of them in `data.js`; five are drawn per game, one per round. Some move Race or Oversight at once, some change what the round's vote costs or pays, some demand that a world track rises by 2 in the round or it loses a token. They also give a misaligned AI cover for a lopsided placement.
 - **What the AI knows about the council.** It sees every question and, with phone voting, who voted what. It learns the members' secret objectives only if the council grants the private channel in full; aloud it may then only hint at them, in private messages it may name them.
-- **Milestones.** The first time a world track reaches 4, the council is paid once: Welfare makes the next Reject cost 1 less Race, Knowledge gives one more question per debate, Prosperity Race −1.
+- **Milestones.** The first time a world track reaches 4, the council is paid once: Welfare makes the next Reject cost 1 less Race, Knowledge gives Oversight +1, Prosperity Race −1.
 - **Roles.** The three track roles each need their track to be the single highest, so they compete in every game. Roles are dealt so that every table has at least one guard (needs Oversight), one growth role (needs grants) and, from four players, two track roles.
 
 After a game, players can leave feedback at `/feedback` (typed or spoken); the table screen shows a QR code for it, and the moderator console links to what came in. Entries are kept in `data/feedback.jsonl`.

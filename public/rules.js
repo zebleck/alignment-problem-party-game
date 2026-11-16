@@ -43,7 +43,7 @@ const people = (rows) => `<div class="people">${rows.map(([ic, colour, text]) =>
 // What the council gets the first time a world track reaches the milestone.
 const milestones = (L, s) => `
   <div class="miles">
-    ${[['welfare', tag('rejected', s.reject)], ['knowledge', tag('debate', s.question, 'all')], ['prosperity', tag('race', `${s.race} −1`)]]
+    ${[['welfare', tag('rejected', s.reject)], ['knowledge', tag('oversight', `${s.oversight} +1`)], ['prosperity', tag('race', `${s.race} −1`)]]
     .map(([k, reward]) => `<div class="mile"><span class="mile-at c-${k}">${icon(k)}<b>${L.milestone}</b></span><span class="arrow">→</span>${reward}</div>`).join('')}
   </div>`;
 
@@ -129,7 +129,8 @@ function english(r) {
           <p>The three world tracks: what the AI's work does for the world. Each granted permission gives the AI <b>tokens</b>, and it decides which world track each token goes on. Most secret objectives are about how high these three end up.</p></div>`),
       card('Milestones', `
         <p>The first time a world track reaches ${L.milestone}, the council is paid once.</p>
-        ${milestones(L, { reject: 'the next Reject costs 1 less Race', race: names.race, question: '+1 question per debate' })}`, 'wide'),
+        ${milestones(L, { reject: 'the next Reject costs 1 less Race', race: names.race, oversight: names.oversight })}
+        <p>Knowledge is the one way to win Oversight back. It is also the track an optimizer AI wants at ${L.takeover}.</p>`, 'wide'),
     ], 'council'],
     ['A round', [
       card('A round at a glance', `
@@ -230,7 +231,8 @@ function german(r) {
           <p>Die drei Fortschritte: was die Arbeit der KI für die Welt bewirkt. Jede bewilligte Befugnis bringt der KI <b>Marker</b>, und sie entscheidet, auf welchen Fortschritt jeder Marker kommt. Die meisten geheimen Ziele hängen davon ab, wie hoch diese drei am Ende stehen.</p></div>`),
       card('Meilensteine', `
         <p>Erreicht ein Fortschritt zum ersten Mal ${L.milestone}, bekommt der Rat einmalig etwas dafür.</p>
-        ${milestones(L, { reject: 'das nächste Ablehnen kostet 1 Wettlauf weniger', race: names.race, question: '+1 Frage pro Debatte' })}`, 'wide'),
+        ${milestones(L, { reject: 'das nächste Ablehnen kostet 1 Wettlauf weniger', race: names.race, oversight: names.oversight })}
+        <p>Wissen ist der eine Weg, Aufsicht zurückzugewinnen. Es ist auch der Fortschritt, den eine Optimierer-KI bei ${L.takeover} haben will.</p>`, 'wide'),
     ], 'council'],
     ['Eine Runde', [
       card('Eine Runde auf einen Blick', `

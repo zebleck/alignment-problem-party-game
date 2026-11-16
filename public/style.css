@@ -660,3 +660,21 @@ body.phone #roleName .role-ic { width: 0.9em; height: 0.9em; margin-right: 0.25e
   .rules table.decisions td { overflow-wrap: anywhere; hyphens: auto; }
   .perm-ic em { color: #fff; }
 }
+
+/* ---------- the three kinds of AI, drawn ---------- */
+.ai-fig { display: inline-flex; flex: none; width: 5.5em; height: 5.5em; --ic-knockout: var(--panel-2); }
+.ai-fig svg { width: 100%; height: 100%; display: block; }
+.obj { display: grid; grid-template-columns: 5.5em 1fr; gap: 1em; align-items: center; }
+.obj > div { color: var(--text); }
+.obj .obj-head { color: var(--c); }
+.ai-option { display: flex; flex-direction: column; align-items: flex-start; }
+.ai-option .ai-fig { width: 7em; height: 7em; margin-bottom: 0.5em; --ic-knockout: var(--panel); }
+.ai-was { display: flex; align-items: center; gap: 1em; margin-top: 0.6em; }
+.ai-was .ai-fig { width: 6.5em; height: 6.5em; --ic-knockout: var(--panel); }
+.ai-was-name { color: var(--ai); font-size: 1.2em; }
+body.phone #guessBtns button.ai-guess { display: flex; align-items: center; gap: 14px; }
+body.phone #guessBtns .ai-fig { width: 4.6em; height: 4.6em; --ic-knockout: var(--panel); }
+body.phone .ai-was .ai-fig { width: 4.5em; height: 4.5em; }
+/* At the reveal the AI's box sits in a row next to the outcome: there it must wrap its text
+   instead of growing as wide as the sentence. */
+body.table .screen .row > .ai-box { flex: 1 1 22em; min-width: 0; }

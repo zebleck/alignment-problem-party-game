@@ -5,7 +5,7 @@ import { t, N } from '/i18n.js';
 import { icon } from '/icons.js';
 
 export { t, N, setLang, getLang } from '/i18n.js';
-export { icon, roleIcon, ICON } from '/icons.js';
+export { icon, roleIcon, aiFigure, ICON } from '/icons.js';
 
 export const WORLD = ['welfare', 'knowledge', 'prosperity'];
 

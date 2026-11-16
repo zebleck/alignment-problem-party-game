@@ -74,7 +74,7 @@
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
-import { connect, esc, $, t, N, icon, roleIcon, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
+import { connect, esc, $, t, N, icon, roleIcon, aiFigure, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 
 const rules = rulesOverlay();
@@ -281,7 +281,7 @@ function render() {
   $('#guessPanel').classList.toggle('hidden', s.phase !== 'guess');
   $('#guessTitle').textContent = t('Which AI was it?');
   if (s.phase === 'guess') {
-    $('#guessBtns').innerHTML = s.objectives.map((o) => `<button data-o="${o.key}" class="${me.guess === o.key ? 'selected' : ''}"><b>${esc(o.name)}</b><br><span class="muted">${esc(o.goal)}</span></button>`).join('');
+    $('#guessBtns').innerHTML = s.objectives.map((o) => `<button data-o="${o.key}" class="ai-guess ${me.guess === o.key ? 'selected' : ''}">${aiFigure(o.key)}<span><b>${esc(o.name)}</b><br><span class="muted">${esc(o.goal)}</span></span></button>`).join('');
     for (const b of $('#guessBtns').children) b.onclick = () => conn.send({ type: 'guess', objective: b.dataset.o });
   }
 
@@ -291,7 +291,7 @@ function render() {
   if (mine) {
     $('#resultPanel').innerHTML = `<div class="label">${esc(endingText(s.result.ending).title)}</div>
       <div class="big ${mine.success ? 'yes' : 'no'}">${mine.success ? t('You reached your objective.') : t('You did not reach your objective.')}</div>
-      <div class="muted">${t('The AI was {name}.', { name: esc(s.result.objective.name) })}</div>`;
+      <div class="ai-was">${aiFigure(s.result.aiObjective)}<div class="muted">${t('The AI was {name}.', { name: esc(s.result.objective.name) })}</div></div>`;
   }
 
   $('#rulesBtn').textContent = t('Rulebook');

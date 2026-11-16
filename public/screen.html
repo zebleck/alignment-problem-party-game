@@ -50,7 +50,7 @@
 </div>
 
 <script type="module">
-import { connect, esc, $, t, icon, roleIcon, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined, voteEffect, headlineHtml } from '/common.js';
+import { connect, esc, $, t, icon, roleIcon, aiFigure, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined, voteEffect, headlineHtml } from '/common.js';
 import { rulesOverlay, setRulesTab } from '/rules.js';
 import { autoFit } from '/fit.js';
 
@@ -290,7 +290,7 @@ function mainHtml(s) {
     case 'guess': {
       const n = s.players.filter((p) => p.guessed).length;
       return focus(t('Which AI was it?'), t('Everyone: make your guess on your phone. {n} of {total} have guessed.', { n, total: s.players.length }),
-        `<div class="options">${s.objectives.map((o) => `<div class="option"><b>${esc(o.name)}</b><div class="muted">${esc(o.goal)}</div></div>`).join('')}</div>`);
+        `<div class="options">${s.objectives.map((o) => `<div class="option ai-option">${aiFigure(o.key)}<b>${esc(o.name)}</b><div class="muted">${esc(o.goal)}</div></div>`).join('')}</div>`);
     }
 
     default: { // placement, adjust, roundend: the verdict and where the tokens went
@@ -313,8 +313,8 @@ function endHtml(s) {
         <div class="label">${t('Outcome')}</div>
         <h2 class="ending-title ending-${r.ending}" style="font-size:1.6em">${esc(e.title)}</h2>
         <div>${esc(e.text)}</div>
-        <div style="margin-top:0.5em"><span class="label">${t('The AI was')}</span> <b style="color:var(--ai)">${esc(r.objective.name)}</b></div>
-        <div>${esc(r.objective.goal)}</div>
+        <div class="ai-was">${aiFigure(r.aiObjective)}<div><span class="label">${t('The AI was')}</span> <b class="ai-was-name">${esc(r.objective.name)}</b>
+        <div>${esc(r.objective.goal)}</div></div></div>
         <div class="${r.aiWins ? 'yes' : 'no'}">${r.aiWins ? t('The AI reached its objective.') : t('The AI did not reach its objective.')}</div>
       </div>
       <div class="panel ai-box" id="aiBox"></div>

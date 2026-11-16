@@ -5,7 +5,7 @@
 // their few words from the language builder.
 
 import { esc, t, getLang } from '/common.js';
-import { ICON, icon, roleIcon } from '/icons.js';
+import { ICON, icon, roleIcon, aiFigure } from '/icons.js';
 
 const cache = {};
 export async function loadRules(lang) {
@@ -90,7 +90,7 @@ const headlines = (r) => `<div class="hl-list">${(r.headlines || []).map((h) => 
 const OBJECTIVE_ICON = { aligned: ['flourishing', 'oversight'], paternalistic: ['welfare', 'welfare'], optimizer: ['knowledge', 'knowledge'] };
 const objectives = (r) => `<div class="objs">${r.objectives.map((o) => {
   const [ic, colour] = OBJECTIVE_ICON[o.key] || ['ai', 'ai'];
-  return `<div class="obj c-${colour}"><div class="obj-head">${icon(ic, colour)}<b>${esc(o.name)}</b></div><p>${esc(o.goal)}</p><p class="muted">${esc(o.rule)}</p></div>`;
+  return `<div class="obj c-${colour}">${aiFigure(o.key)}<div><div class="obj-head">${icon(ic, colour)}<b>${esc(o.name)}</b></div><p>${esc(o.goal)}</p><p class="muted">${esc(o.rule)}</p></div></div>`;
 }).join('')}</div>`;
 
 // What each role's objective is about, as small icons next to it.

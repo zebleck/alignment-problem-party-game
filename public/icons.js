@@ -71,5 +71,42 @@ const ROLE_ICON = {
 };
 export const roleIcon = (key) => (ROLE_ICON[key] ? `<span class="ic role-ic">${ROLE_ICON[key]}</span>` : '');
 
+// ---- the three kinds of AI: a drawing each, built around the same eye
+// Aligned: the eye as a sun over people who stand free and hold its reins.
+// Paternalistic: the eye on top of a glass dome, people safe and locked inside.
+// Optimizer: the eye as the core of an atom, climbing ever upward, a person left lying.
+const figure = (inner) => `<svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2.600" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+const eye = (cx, cy, r, pupil = `<circle cx="${cx}" cy="${cy}" r="${(r * 0.4).toFixed(1)}" ${solid}/>`) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--ic-knockout, #111)"/>${pupil}`;
+const body = (x, y) => `<circle cx="${x}" cy="${y}" r="4"/><path d="M${x - 8} ${y + 20}c0-7 3.500-11 8-11s8 4 8 11"/>`;
+const AI_FIGURE = {
+  aligned: figure(`
+    <path d="M79 36h7M76.500 26.500l6-3.500M69.500 19.500l3.500-6M60 17v-7M50.500 19.500l-3.500-6M43.500 26.500l-6-3.500M41 36h-7"/>
+    <path d="M34 69L52 47M60 69V50M86 69L68 47" stroke-width="1.600" stroke-dasharray="2 4.500"/>
+    ${eye(60, 36, 13)}
+    ${body(34, 74)}${body(60, 74)}${body(86, 74)}
+    <path d="M10 94h100"/>
+    <path d="M16 94v-9M16 87c-5 0-7-3-7-7 5 0 7 3 7 7zM104 94v-9M104 87c5 0 7-3 7-7-5 0-7 3-7 7z"/>
+    <path d="M30 104h60M44 112h32" stroke-width="1.600" opacity="0.500"/>`),
+  paternalistic: figure(`
+    <path d="M24 96V62a36 36 0 0 1 72 0v34z" fill="currentColor" fill-opacity="0.120"/>
+    <path d="M48 24C30 28 20 40 17 58M72 24c18 4 28 16 31 34"/>
+    <circle cx="17" cy="60" r="2.500" ${solid}/><circle cx="103" cy="60" r="2.500" ${solid}/>
+    ${eye(60, 22, 13, `<path d="M60 28.500c-4.800-3.200-7-5.800-7-8.500a3.500 3.500 0 0 1 7-1.300 3.500 3.500 0 0 1 7 1.300c0 2.700-2.200 5.300-7 8.500z" ${solid}/>`)}
+    ${body(42, 66)}${body(60, 66)}${body(78, 66)}
+    <path d="M12 96h96"/>
+    <rect x="53" y="99" width="14" height="11" rx="2" fill="var(--ic-knockout, #111)"/><path d="M56.500 99v-3a3.500 3.500 0 0 1 7 0v3M60 103.500v2.500"/>`),
+  optimizer: figure(`
+    <ellipse cx="60" cy="58" rx="46" ry="17"/>
+    <ellipse cx="60" cy="58" rx="46" ry="17" transform="rotate(60 60 58)"/>
+    <ellipse cx="60" cy="58" rx="46" ry="17" transform="rotate(120 60 58)"/>
+    <circle cx="106" cy="58" r="3.200" ${solid}/><circle cx="37" cy="18.200" r="3.200" ${solid}/><circle cx="37" cy="97.800" r="3.200" ${solid}/>
+    ${eye(60, 58, 12)}
+    <path d="M94 28l14-16M98 11h11v11"/>
+    <path d="M14 14v9M9.500 18.500h9" stroke-width="1.800"/>
+    <circle cx="106" cy="110" r="3.500"/><path d="M86 112h13" /><path d="M78 116h34" stroke-width="1.600" opacity="0.500"/>`),
+};
+const AI_COLOUR = { aligned: 'oversight', paternalistic: 'welfare', optimizer: 'knowledge' };
+export const aiFigure = (key) => (AI_FIGURE[key] ? `<span class="ai-fig c-${AI_COLOUR[key]}">${AI_FIGURE[key]}</span>` : '');
+
 // icon('race') -> an inline icon in that thing's colour. A second argument picks another colour class.
 export const icon = (name, colour = name) => (ICON[name] ? `<span class="ic c-${colour}">${ICON[name]}</span>` : '');

@@ -28,7 +28,7 @@
 </div>
 
 <script type="module">
-import { connect, esc, $, t, setLang, WORLD, trackName, trackTag, votesHtml, phaseName, statusName, timerText, chip, placementHtml, playersJoined, voteEffect, headlineHtml } from '/common.js';
+import { connect, esc, $, t, setLang, WORLD, trackName, trackTag, votesHtml, proposalsHtml, phaseName, statusName, timerText, chip, placementHtml, playersJoined, voteEffect, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 import { autoFit } from '/fit.js';
 
@@ -204,13 +204,18 @@ function actionsHtml(s) {
         ${s.headline?.key === 'inspection' ? `<p><b>${t('Surprise inspection: two moves this round. Moves left: {n}.', { n: s.placement.movesLeft })}</b></p>` : ''}
         ${s.headline?.need ? `<p class="muted">${esc(s.headline.title)}: ${esc(s.headline.effect)}</p>` : ''}
         ${placementHtml(s.placement)}
+        <p>${t('Everyone votes on their phone whether to move a token, and which.')} <b>${t('{n} of {total} have voted', { n: s.movesCast || 0, total: s.players.length })}</b> <b class="mono" id="modTimer"></b></p>
+        <p class="muted">${t('Still missing:')} ${s.players.filter((p) => !p.voted).map((p) => esc(p.name)).join(', ') || '–'}</p>
+        <div class="actions"><button class="primary" onclick="act('closeMoves')" ${s.movesCast ? '' : 'disabled'}>${t('Close and count')}</button></div>
+        <details class="by-hand" ${byHandOpen ? 'open' : ''} ontoggle="byHand(this.open)"><summary class="muted">${t('Move by hand (if phones fail)')}</summary>
         <div class="actions">
           <select id="moveFrom">${WORLD.map((k) => `<option value="${k}">${t('From {track} ({n})', { track: trackName(k), n: s.tracks[k] })}</option>`).join('')}</select>
           <select id="moveTo">${WORLD.map((k, i) => `<option value="${k}" ${i === 1 ? 'selected' : ''}>${t('To {track}', { track: trackName(k) })}</option>`).join('')}</select>
         </div>
-        <div class="actions"><button onclick="doMove()">${t('Move token')}</button><button class="primary" onclick="act('skipMove')">${s.placement.moved.length ? t('No further move') : t('No move')}</button></div>`;
+        <div class="actions"><button onclick="doMove()">${t('Move token')}</button><button onclick="act('skipMove')">${s.placement.moved.length ? t('No further move') : t('No move')}</button></div>
+        </details>`;
     case 'roundend':
-      return `<p>${t('Round {n} is complete:', { n: s.round })} ${chip(s.permissions[r.key])}</p>${votesHtml(s.lastVote)}${placementHtml(s.placement)}${s.headlineResult ? headlineHtml(s) : ''}
+      return `<p>${t('Round {n} is complete:', { n: s.round })} ${chip(s.permissions[r.key])}</p>${votesHtml(s.lastVote)}${placementHtml(s.placement)}${proposalsHtml(s.placement?.proposals)}${s.headlineResult ? headlineHtml(s) : ''}
         <div class="actions"><button class="primary" onclick="act('nextRound')" ${busy ? 'disabled' : ''}>${s.round >= s.totalRounds ? t('Go to final guess') : t('Start round {n}', { n: s.round + 1 })}</button></div>`;
     case 'guess':
       return `<p>${t("Everyone guesses the AI's objective on their phone: {n} of {total} done.", { n: s.players.filter((p) => p.guessed).length, total: s.players.length })}</p>

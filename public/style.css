@@ -356,7 +356,7 @@ body.table .overlay .panel { padding: 2em 2.2em; }
 body.table .overlay h2 { font-family: var(--serif); font-weight: 400; font-size: 2.2em; }
 body.table .overlay button.primary { font-family: var(--mono); font-size: 0.85em; letter-spacing: 0.14em; text-transform: uppercase; padding: 1em 1.6em; }
 body.table .ending-title { font-family: var(--serif); font-weight: 400; font-size: 2.4em !important; line-height: 1.05; margin: 0.1em 0 0.15em; color: var(--paper); }
-body.table .ending-race, body.table .ending-disempowered { color: var(--bad); }
+body.table .ending-race, body.table .ending-disempowered, body.table .ending-takeover { color: var(--bad); }
 body.table .ending-flourishing { color: var(--ok); }
 body.table .pcard { border-radius: 2px; }
 
@@ -703,3 +703,15 @@ body.table .screen .row > .ai-box { flex: 1 1 22em; min-width: 0; }
 .by-hand { margin-top: 0.8em; }
 .by-hand summary { cursor: pointer; }
 .stats span { display: inline-flex; align-items: center; gap: 0.4em; }
+
+/* ---------- the council's vote on moving a token ---------- */
+#moveBody { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.move-none { padding: 14px; text-align: left; font-weight: 600; }
+.move-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.move-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px; font-size: 0.85em; }
+.move-btn .ic { width: 1.7em; height: 1.7em; }
+.move-btn b { font-family: var(--mono); font-size: 1.2em; }
+.move-btn.selected, .move-none.selected { outline: 2px solid var(--ai); background: color-mix(in srgb, var(--ai) 12%, var(--panel-2)); }
+.proposals { margin: 0.6em 0; }
+.proposal { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3em 0.8em; padding: 0.35em 0; border-top: 1px solid var(--line); }
+.proposal .tag { font-weight: 600; }

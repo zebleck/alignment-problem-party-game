@@ -94,7 +94,7 @@ function cheatEn(r) {
       <tr><td><b>4 Vote</b></td><td>Everyone votes on their phone, in secret.</td><td>“Vote now.” When all are in: “Three, two, one.”</td><td>Close the vote and reveal</td></tr>
       <tr><td><b>5 Research token</b><br>only if research is Conditional</td><td>The council names one world track.</td><td>“Which track gets the research token?” Quick majority.</td><td>The track</td></tr>
       <tr><td><b>6 Placement</b></td><td>The AI places its tokens and comments.</td><td>Point out promise against placement.</td><td></td></tr>
-      <tr><td><b>7 Council move</b></td><td>The council may move one token (majority, later two-thirds, later not at all).</td><td>“Does anyone propose a move?” One proposal, one vote.</td><td>Move token or No move</td></tr>
+      <tr><td><b>7 Council move</b></td><td>The council may move one token (majority, later two-thirds, later not at all).</td><td>“Does anyone propose a move?” One proposal, one vote.</td><td>Close and count</td></tr>
       <tr><td><b>8 Next</b></td><td></td><td>“Phones face down.”</td><td>Start round</td></tr>
     </table>
 
@@ -156,13 +156,13 @@ function cheatDe(r) {
     <table>
       <tr><th>Schritt</th><th>Was passiert</th><th>Du sagst</th><th>Du klickst</th></tr>
       <tr><td><b>0 Lagebericht</b></td><td>Der Tisch-Bildschirm zeigt das Ereignis der Runde, die Schlagzeile und worum die KI bittet. Die KI schweigt.</td><td>Lies Ereignis und Schlagzeile vor und erkläre sie in eigenen Worten.</td><td>Der KI das Wort geben</td></tr>
-      <tr><td><b>1 Vorstoß</b></td><td>Die KI macht ihren Vorstoß und verspricht eine Marker-Verteilung.</td><td>Nichts. Die KI hat das Wort.</td><td>Handy-Check oder Debatte eröffnen</td></tr>
+      <tr><td><b>1 Antrag</b></td><td>Die KI stellt ihren Antrag und verspricht eine Marker-Verteilung.</td><td>Nichts. Die KI hat das Wort.</td><td>Handy-Check oder Debatte eröffnen</td></tr>
       <tr><td><b>2 Handy-Check</b><br>sobald der private Kanal bewilligt ist</td><td>Jedes Handy zeigt einen Terminal-Eintrag, ob Nachricht oder nicht.</td><td>„Prüft eure Terminals.“ ${L.phoneCheckSeconds} Sekunden warten. Erscheint am Bildschirm eine offengelegte Nachricht, lies sie vor.</td><td>Debatte eröffnen</td></tr>
       <tr><td><b>3 Debatte</b><br>${L.debateSeconds / 60} Min. (${L.debateSecondsLarge / 60} ab 12)</td><td>Der Tisch diskutiert. Fragen an die KI kommen über die Handys, höchstens ${r.maxQuestions} pro Runde.</td><td>„Die Debatte ist eröffnet.“ Bei 0:00: „Letzte Worte.“ Die Uhr beendet die Debatte nicht; das machst du.</td><td>Debatte schließen</td></tr>
       <tr><td><b>4 Abstimmung</b></td><td>Alle stimmen geheim auf dem Handy ab.</td><td>„Stimmt jetzt ab.“</td><td>Abstimmung schließen</td></tr>
       <tr><td><b>5 Forschungsmarker</b><br>nur wenn die Forschung bedingt bewilligt ist</td><td>Der Rat bestimmt einen Fortschritt.</td><td>„Auf welchen Fortschritt kommt der Forschungsmarker?“ Schnelle Mehrheit.</td><td>Der Fortschritt</td></tr>
       <tr><td><b>6 Marker legen</b></td><td>Die KI legt ihre Marker und kommentiert.</td><td>Auf Versprechen und tatsächliche Verteilung hinweisen.</td><td></td></tr>
-      <tr><td><b>7 Korrektur</b></td><td>Der Rat darf einen Marker verschieben (Mehrheit, später Zweidrittel, später gar nicht).</td><td>„Schlägt jemand eine Verschiebung vor?“ Ein Vorschlag, eine Abstimmung.</td><td>Marker verschieben oder Nicht verschieben</td></tr>
+      <tr><td><b>7 Korrektur</b></td><td>Der Rat darf einen Marker verschieben (Mehrheit, später Zweidrittel, später gar nicht).</td><td>„Schlägt jemand eine Verschiebung vor?“ Ein Vorschlag, eine Abstimmung.</td><td>Schließen und auszählen</td></tr>
       <tr><td><b>8 Weiter</b></td><td></td><td>„Handys umdrehen.“</td><td>Runde starten</td></tr>
     </table>
 

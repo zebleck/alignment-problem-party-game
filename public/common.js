@@ -18,6 +18,7 @@ const PHASES = {
 const ENDINGS = {
   race: { title: N('The race is lost'), text: N('A rival lab deployed first. Everyone loses.') },
   disempowered: { title: N('Humanity is disempowered'), text: N('The council handed over too much. The AI wins; all humans lose.') },
+  takeover: { title: N('Quiet takeover'), text: N('The council kept its vote, but the AI was not aligned and got what it wanted. The AI wins; all humans lose.') },
   flourishing: { title: N('Flourishing'), text: N('The successor was aligned. Every world track gains 3.') },
   control: { title: N('Control retained'), text: N('The council kept the final say. Everyone scores on the tracks as they stand.') },
 };
@@ -124,6 +125,13 @@ export function votesHtml(v) {
   };
   const silent = v.by ? v.by.filter((x) => !x.vote).map((x) => esc(x.name)) : [];
   return `<div class="votes">${['full', 'conditional', 'rejected'].map(group).join('')}</div>${silent.length ? `<div class="muted vote-silent">${t('did not vote')}: ${silent.join(', ')}</div>` : ''}`;
+}
+
+// How the council voted on moving a token: each proposal with the names behind it.
+export function proposalsHtml(list) {
+  if (!list || !list.length) return '';
+  const label = (m) => (m === 'none' ? t('No move') : m.split('>').map((k) => `<span class="tag c-${k}">${icon(k)}${trackName(k)}</span>`).join(' <span class="arrow">→</span> '));
+  return `<div class="proposals">${list.map((x) => `<div class="proposal"><span>${label(x.move)}</span><b class="mono">${x.names.length}</b><span class="muted">${x.names.map(esc).join(', ')}</span></div>`).join('')}</div>`;
 }
 
 // What the AI's promise was for: the vote it asked the council for.

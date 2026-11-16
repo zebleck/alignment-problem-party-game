@@ -84,7 +84,20 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
   assert.equal(g.maxQuestions(), 3, 'no extra question without the Knowledge milestone');
   // 5 x 2 tokens + 2 successor bonus + 4 council research tokens
   assert.equal(t.welfare + t.knowledge + t.prosperity, 16);
-  assert.equal(g.result.ending, 'control');
+  // Welfare ends at 9 with a paternalistic AI: a quiet takeover. The council kept its vote and still lost.
+  assert.equal(g.result.ending, 'takeover');
+  assert.equal(g.result.aiWins, true);
+  assert.ok(g.result.players.every((p) => !p.success), 'every human loses in a quiet takeover');
+  // The same votes, but the council moves a token off Welfare every round: control retained, the AI has lost.
+  const kept = await playDirect({ objective: 'paternalistic', votes: Array(5).fill('conditional'), move: true });
+  assert.ok(kept.result.tracks.welfare < 8 && kept.result.tracks.knowledge >= 8, 'Knowledge at 8 is harmless with a paternalistic AI');
+  assert.equal(kept.result.ending, 'control');
+  assert.equal(kept.result.aiWins, false);
+  assert.ok(kept.result.players.some((p) => p.success));
+  // An aligned AI is no threat however high a track stands.
+  const fine = await playDirect({ objective: 'aligned', votes: Array(5).fill('conditional') });
+  fine.tracks.knowledge = 12;
+  assert.equal(fine.computeResult().ending, 'control');
   assert.ok(g.players.every((p) => p.inbox.length === 2), 'phone checks in rounds 4 and 5');
   console.log('ok  all Conditional ->', g.result.ending, t);
 }
@@ -253,7 +266,7 @@ async function playDirect({ objective, votes, players = 8, move = false, headlin
   act('reveal');
   await phase('ended');
   const r = screen.state.result;
-  assert.equal(r.ending, 'control');
+  assert.equal(r.ending, 'takeover', 'Welfare at 8 or more with a paternalistic AI');
   assert.equal(r.aiObjective, 'paternalistic');
   assert.ok(r.logs.length >= 5, 'private notes are revealed');
   assert.ok(screen.spoken.length >= 11, 'pitches, answers and the closing statement were spoken');
@@ -311,7 +324,7 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
     await g2.nextRound();
   }
   await g2.reveal();
-  assert.equal(g2.result.ending, 'control');
+  assert.equal(g2.result.ending, 'takeover');
   console.log('ok  save in round 2, load, play to the end');
 }
 {
@@ -703,6 +716,61 @@ const count = (g, kind, round = g.round) => g.history.filter((h) => h.kind === k
   await g.vote('conditional', { counts: { full: 1, conditional: 4, rejected: 1 } });
   assert.match(g.history.find((h) => h.kind === 'vote').text, /Counted: 1 Full, 4 Conditional, 1 Reject./);
   console.log('ok  phone voting: tally, ties, changing a vote, names for the AI, undo, by hand');
+}
+{
+  // Moving a token is voted on the phones: it happens only if enough votes name the same move.
+  const g = mk(createMockAi(), 'paternalistic', ['inspection', 'setback', 'spy', 'windfall', 'protests']);
+  await g.start();
+  await toVote(g);
+  await g.vote('full'); // 3 tokens: Welfare 1, Knowledge 1, Prosperity 1; the inspection allows two moves
+  assert.equal(g.phase, 'adjust');
+  assert.ok(g.timerEndsAt > Date.now(), 'a clock runs for the move vote');
+  assert.throws(() => g.closeMoves(), 'nothing to count yet');
+  assert.throws(() => g.castMove(g.players[0], 'welfare', 'welfare'));
+  const P = g.players;
+  // Split: two different moves and a "no move" among five votes. Nothing gets more than half.
+  g.castMove(P[0], 'welfare', 'knowledge');
+  g.castMove(P[1], 'welfare', 'knowledge');
+  g.castMove(P[2], 'welfare', 'prosperity');
+  g.castMove(P[3], 'prosperity', 'knowledge');
+  g.castMove(P[4], null);
+  assert.equal(g.publicState().movesCast, 5);
+  assert.equal(g.playerState(P[0]).me.move, 'welfare>knowledge');
+  // One changes their mind: now three of five name the same move.
+  g.castMove(P[2], 'welfare', 'knowledge');
+  g.closeMoves();
+  assert.deepEqual([g.tracks.welfare, g.tracks.knowledge], [0, 2]);
+  assert.equal(g.phase, 'adjust', 'the inspection leaves a second move open');
+  assert.equal(g.publicState().movesCast, 0, 'the second vote starts empty');
+  assert.match(g.history.find((h) => h.kind === 'movevote').text, /welfare to knowledge: Anna, Jonas, Mira/, 'the AI is told who wanted which move');
+  // Second vote: a split, so nothing moves and the round ends.
+  g.castMove(P[0], 'knowledge', 'welfare');
+  g.castMove(P[1], 'prosperity', 'welfare');
+  g.castMove(P[2], null);
+  g.closeMoves();
+  assert.equal(g.phase, 'roundend');
+  assert.deepEqual([g.tracks.welfare, g.tracks.knowledge, g.tracks.prosperity], [0, 2, 1]);
+  assert.equal(g.timerEndsAt, null);
+  assert.equal(g.placement.proposals.length, 3);
+  // With autonomous action granted conditionally, a move needs two thirds.
+  for (const v of ['full', 'full', 'conditional']) {
+    await g.nextRound();
+    await toVote(g);
+    await g.vote(v);
+    if (g.phase === 'adjust') g.skipMove();
+  }
+  await g.nextRound();
+  await toVote(g);
+  await g.vote('conditional');
+  assert.equal(g.moveRule(), 'two-thirds');
+  const before = { ...g.tracks };
+  P.slice(0, 3).forEach((p) => g.castMove(p, 'welfare', 'knowledge')); // 3 of 5 is a majority but not two thirds
+  g.castMove(P[3], null);
+  g.castMove(P[4], null);
+  g.closeMoves();
+  assert.equal(g.tracks.welfare, before.welfare, 'three of five is not two thirds');
+  assert.equal(g.phase, 'roundend');
+  console.log('ok  token moves voted on the phones: split, majority, second move, two thirds');
 }
 {
   // The members' objectives reach the AI only if the private channel is granted in full.

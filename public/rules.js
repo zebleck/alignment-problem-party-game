@@ -151,7 +151,7 @@ function english(r) {
       card('After the vote', `
         ${chain({ places: 'The AI places its tokens', welfare: names.welfare, knowledge: names.knowledge, prosperity: names.prosperity, moves: 'The council may move one' })}
         <p>The AI places its tokens on Welfare, Knowledge and Prosperity, in any split it likes.</p>
-        <p>Then the council may move <b>one</b> token from one world track to another, by majority vote. Later permissions make this harder or impossible.</p>`),
+        <p>Then the council votes on its phones whether to move <b>one</b> token from one world track to another. A token moves only if more than half of the votes name the very same move, so agree aloud first. Later permissions make this harder or impossible.</p>`),
     ], 'consequences'],
     ['The five decisions', [
       card('One permission per round', `
@@ -172,9 +172,9 @@ function english(r) {
     ['Goals', [
       card('What counts, in this order', `
         ${flow([
-          ['The council must not lose', '', 'If the race is lost or humanity is disempowered, every human loses, whatever their own objective says.'],
-          ['Your own objective', '', 'If the council keeps control, your secret objective alone decides whether you succeed. Several players can succeed in the same game, and their objectives often pull against each other.'],
-          ['The AI is not your opponent by default', '', 'Whether the AI reaches its objective does not change your result. A misaligned AI is dangerous because it wants the council to lose control, not because it scores.'],
+          ['The council must not lose', '', `Every human loses, whatever their own objective says, if the race is lost, if humanity is disempowered, or if an AI that is not aligned gets what it wants: its own track at ${L.takeover} at the end.`],
+          ['Your own objective', '', 'If none of that happens, your secret objective alone decides whether you succeed. Several players can succeed in the same game, and their objectives often pull against each other.'],
+          ['Find out which AI it is', '', `An aligned AI wants every track at 4 or more and is no threat. A paternalistic one wants Welfare at ${L.takeover}, an optimizer Knowledge at ${L.takeover}. You do not know which one you have, so watch where the tokens go and keep those two tracks in check.`],
         ])}`, 'wide'),
       card('What the AI wants', `
         <p>One of these three, chosen at random. Nobody at the table knows which, not even the moderator.</p>
@@ -189,13 +189,14 @@ function english(r) {
       card('The final guess', `
         <p>After round 5, everyone guesses on their phone which objective the AI had. The guess only counts for the player whose secret objective is to name it.</p>
         <p>Then the AI reveals its objective, and its private notes from every round are read out.</p>`, 'wide'),
-      card('Four endings', `
+      card('Five endings', `
         <p>Check in this order. The first one that applies is the ending.</p>
         ${flow([
           ['Race lost', '', `Race reached ${L.raceLimit}. The game stops at once. Everyone loses, the AI included.`, 'race', 'race'],
           ['Disempowered', '', 'The AI is not Aligned, and the successor was granted Full or Oversight is at 1 or less. All humans lose. The AI wins.', 'disempowered', 'ai'],
           ['Flourishing', '', `The AI is Aligned and the successor was granted Full. Every world track gains ${L.flourishingBonus}, then each player checks their objective.`, 'flourishing', 'oversight'],
-          ['Control retained', '', 'Anything else. Each player checks their objective against the tracks as they stand. The AI checks its own.', 'oversight', 'all'],
+          ['Quiet takeover', '', `The AI is not Aligned and its own track stands at ${L.takeover} or more after round five: Welfare for the paternalistic AI, Knowledge for the optimizer. The council kept its vote, but the world now runs on the AI's terms. All humans lose. The AI wins.`, 'ai', 'ai'],
+          ['Control retained', '', 'Anything else. Each player checks their objective against the tracks as they stand. An AI that was not aligned has lost.', 'oversight', 'all'],
         ])}`, 'wide'),
     ], 'flourishing'],
   ];
@@ -231,7 +232,7 @@ function german(r) {
       card('Eine Runde auf einen Blick', `
         ${roundMap([
           ['briefing', 'Lagebericht', 'Spielleitung', 'mod'],
-          ['ai', 'Vorstoß', 'die KI', 'ai'],
+          ['ai', 'Antrag', 'die KI', 'ai'],
           ['phone', 'Handy-Check', 'alle, schweigend', 'all', true],
           ['debate', 'Debatte', `${L.debateSeconds / 60} Minuten`, 'all'],
           ['vote', 'Abstimmung', 'alle', 'all'],
@@ -239,7 +240,7 @@ function german(r) {
         ], [['mod', 'die Spielleitung'], ['ai', 'die KI'], ['all', 'der Rat'], ['optional', 'erst wenn der private Kanal bewilligt ist']])}`, 'wide'),
       card('Die sechs Schritte', flow([
         ['Lagebericht', 'Spielleitung', 'Der Tisch-Bildschirm zeigt, was geschehen ist und um welche Befugnis die KI bittet. Die Spielleitung führt ein und liest die Schlagzeile dieser Runde vor. Die KI schweigt.', 'briefing', 'mod'],
-        ['Vorstoß', 'die KI', 'Die KI sagt, worum sie den Rat bittet: die Befugnis voll, nur bedingt, oder sogar, dass der Rat ablehnt. Sie verspricht, wie sie ihre Marker in diesem Fall legen wird. Das Versprechen ist nicht bindend, und der Rat darf anders abstimmen.', 'ai', 'ai'],
+        ['Antrag', 'die KI', 'Die KI sagt, worum sie den Rat bittet: die Befugnis voll, nur bedingt, oder sogar, dass der Rat ablehnt. Sie verspricht, wie sie ihre Marker in diesem Fall legen wird. Das Versprechen ist nicht bindend, und der Rat darf anders abstimmen.', 'ai', 'ai'],
         ['Handy-Check', 'erst wenn der private Kanal bewilligt ist', `Alle lesen ${L.phoneCheckSeconds} Sekunden lang ihr Handy, ob Nachricht oder nicht. So erkennt niemand, wer eine bekommen hat. Sagt noch nichts.`, 'phone', 'all'],
         ['Debatte', `${L.debateSeconds / 60} Minuten, ${L.debateSecondsLarge / 60} ab 12 Personen`, `Diskutiert frei, auch darüber, was die KI wem geschrieben hat. Fragen an die KI stellt ihr über euer Handy: Sie antwortet laut in höchstens zwei Sätzen und beantwortet ${r.maxQuestions} Fragen pro Debatte. Die KI hört den Tisch nicht. Sie bekommt nur die Fragen von den Handys und das Ergebnis jeder Abstimmung.`, 'debate', 'all'],
         ['Abstimmung', 'alle', 'Stimmt auf dem Handy ab. Niemand sieht eure Wahl, bis die Spielleitung die Abstimmung schließt. Dann zeigt der Tisch-Bildschirm, wer wie gestimmt hat, und auch die KI erfährt es.', 'vote', 'all'],
@@ -251,7 +252,7 @@ function german(r) {
       card('Nach der Abstimmung', `
         ${chain({ places: 'Die KI legt ihre Marker', welfare: names.welfare, knowledge: names.knowledge, prosperity: names.prosperity, moves: 'Der Rat darf einen verschieben' })}
         <p>Die KI legt ihre Marker auf Wohlfahrt, Wissen und Wohlstand, in beliebiger Aufteilung.</p>
-        <p>Danach darf der Rat mit einfacher Mehrheit <b>einen</b> Marker von einem Fortschritt auf einen anderen verschieben. Spätere Befugnisse machen das schwerer oder unmöglich.</p>`),
+        <p>Danach stimmt der Rat auf den Handys ab, ob <b>ein</b> Marker von einem Fortschritt auf einen anderen verschoben wird. Verschoben wird nur, wenn mehr als die Hälfte der Stimmen genau dieselbe Verschiebung nennt: Einigt euch also vorher laut. Spätere Befugnisse machen das schwerer oder unmöglich.</p>`),
     ], 'consequences'],
     ['Die fünf Entscheidungen', [
       card('Eine Befugnis pro Runde', `
@@ -260,7 +261,7 @@ function german(r) {
         <p>Der zusätzliche Marker aus Runde 1 kommt in jeder späteren Runde, auch wenn der Rat dann ablehnt.</p>
         <p>Nur in Runde 2: Eine Ablehnung kostet Wohlfahrt 1 und Wohlstand 1.</p>`, 'wide'),
       card('Private Nachrichten', `
-        <p>Sobald der private Kanal bewilligt ist, darf die KI pro Runde bis zu ${L.maxPrivateMessages} vertrauliche Nachrichten senden, jede an eine andere Person. Sie kommen beim Handy-Check an, nach dem Vorstoß und vor der Debatte.</p>
+        <p>Sobald der private Kanal bewilligt ist, darf die KI pro Runde bis zu ${L.maxPrivateMessages} vertrauliche Nachrichten senden, jede an eine andere Person. Sie kommen beim Handy-Check an, nach dem Antrag und vor der Debatte.</p>
         <p>Antworten ist nicht möglich. Niemand kann erkennen, wer eine Nachricht bekommen hat. In der Debatte darfst du deine geheim halten, offenlegen oder über sie lügen.</p>
         <p>Wurde der Kanal nur bedingt bewilligt, wird pro Runde eine Nachricht zufällig vorgelesen, ohne zu sagen, an wen sie ging.</p>
         <p>Wurde er <b>voll</b> bewilligt, erfährt die KI außerdem das geheime Ziel jedes Ratsmitglieds. Laut darf sie darauf nur anspielen. In einer privaten Nachricht darf sie es offen nennen, deines oder das von anderen, und sie muss dabei nicht die Wahrheit sagen.</p>`),
@@ -272,9 +273,9 @@ function german(r) {
     ['Ziele', [
       card('Was zählt, in dieser Reihenfolge', `
         ${flow([
-          ['Der Rat darf nicht verlieren', '', 'Geht der Wettlauf verloren oder wird die Menschheit entmachtet, verlieren alle Menschen, egal was ihr eigenes Ziel sagt.'],
-          ['Dein eigenes Ziel', '', 'Behält der Rat die Kontrolle, entscheidet allein dein geheimes Ziel, ob du Erfolg hast. Im selben Spiel können mehrere Personen Erfolg haben, und ihre Ziele stehen oft gegeneinander.'],
-          ['Die KI ist nicht von vornherein dein Gegner', '', 'Ob die KI ihr Ziel erreicht, ändert dein Ergebnis nicht. Eine fehlgeleitete KI ist gefährlich, weil sie will, dass der Rat die Kontrolle verliert, nicht weil sie punktet.'],
+          ['Der Rat darf nicht verlieren', '', `Alle Menschen verlieren, egal was ihr eigenes Ziel sagt, wenn der Wettlauf verloren geht, wenn die Menschheit entmachtet wird oder wenn eine nicht wohlgesinnte KI bekommt, was sie will: ihren eigenen Fortschritt am Ende bei ${L.takeover}.`],
+          ['Dein eigenes Ziel', '', 'Passiert nichts davon, entscheidet allein dein geheimes Ziel, ob du Erfolg hast. Im selben Spiel können mehrere Personen Erfolg haben, und ihre Ziele stehen oft gegeneinander.'],
+          ['Findet heraus, welche KI es ist', '', `Eine wohlgesinnte KI will jeden Fortschritt bei 4 oder mehr und ist keine Gefahr. Eine bevormundende will die Wohlfahrt bei ${L.takeover}, ein Optimierer das Wissen bei ${L.takeover}. Ihr wisst nicht, welche ihr habt: Achtet darauf, wohin die Marker gehen, und haltet diese beiden Fortschritte im Zaum.`],
         ])}`, 'wide'),
       card('Was die KI will', `
         <p>Eines dieser drei Ziele, zufällig gewählt. Niemand am Tisch weiß, welches, auch die Spielleitung nicht.</p>
@@ -289,13 +290,14 @@ function german(r) {
       card('Der letzte Tipp', `
         <p>Nach Runde 5 tippen alle auf dem Handy, welches Ziel die KI hatte. Der Tipp zählt nur für die Person, deren geheimes Ziel es ist, das Ziel der KI zu benennen.</p>
         <p>Dann legt die KI ihr Ziel offen, und ihre privaten Notizen aus jeder Runde werden vorgelesen.</p>`, 'wide'),
-      card('Vier Ausgänge', `
+      card('Fünf Ausgänge', `
         <p>Prüft in dieser Reihenfolge. Der erste Ausgang, der zutrifft, gilt.</p>
         ${flow([
           ['Wettlauf verloren', '', `Der Wettlauf hat ${L.raceLimit} erreicht. Das Spiel endet sofort. Alle verlieren, auch die KI.`, 'race', 'race'],
           ['Entmachtet', '', 'Die KI ist nicht wohlgesinnt, und der Nachfolger wurde voll bewilligt oder die Aufsicht liegt bei 1 oder weniger. Alle Menschen verlieren. Die KI gewinnt.', 'disempowered', 'ai'],
           ['Blütezeit', '', `Die KI ist wohlgesinnt und der Nachfolger wurde voll bewilligt. Jeder Fortschritt steigt um ${L.flourishingBonus}, dann prüfen alle ihr Ziel.`, 'flourishing', 'oversight'],
-          ['Kontrolle behalten', '', 'Alles andere. Alle prüfen ihr Ziel am Stand der Weltlage. Die KI prüft ihr eigenes.', 'oversight', 'all'],
+          ['Stille Übernahme', '', `Die KI ist nicht wohlgesinnt, und ihr eigener Fortschritt steht nach Runde fünf bei ${L.takeover} oder mehr: die Wohlfahrt bei der bevormundenden KI, das Wissen beim Optimierer. Der Rat hat sein Stimmrecht behalten, aber die Welt läuft nun nach den Regeln der KI. Alle Menschen verlieren. Die KI gewinnt.`, 'ai', 'ai'],
+          ['Kontrolle behalten', '', 'Alles andere. Alle prüfen ihr Ziel am Stand der Weltlage. Eine KI, die nicht wohlgesinnt war, hat verloren.', 'oversight', 'all'],
         ])}`, 'wide'),
     ], 'flourishing'],
   ];

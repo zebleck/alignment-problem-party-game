@@ -333,6 +333,7 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
     councilTrack: (m) => game.setCouncilTrack(m.track),
     move: (m) => game.move(m.from, m.to),
     skipMove: () => game.skipMove(),
+    closeMoves: () => game.closeMoves(), // counted from the phones
     nextRound: () => game.nextRound(),
     reveal: () => game.reveal(),
     reset: () => { try { archive(); } catch {} game.reset(true); }, // record the last steps before they are cleared
@@ -409,6 +410,8 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
           game.ask(playerOf(s), m.text);
         } else if (s.role === 'player' && playerOf(s) && m.type === 'vote') {
           game.castVote(playerOf(s), m.choice);
+        } else if (s.role === 'player' && playerOf(s) && m.type === 'move') {
+          game.castMove(playerOf(s), m.from, m.to);
         } else if (s.role === 'player' && playerOf(s) && m.type === 'guess') {
           game.guess(playerOf(s), m.objective);
         }

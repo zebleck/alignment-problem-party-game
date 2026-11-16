@@ -56,6 +56,12 @@
       <div class="muted" id="voteNote"></div>
     </div>
 
+    <div class="panel hidden" id="movePanel">
+      <div class="label" id="moveTitle"></div>
+      <div id="moveBody"></div>
+      <div class="muted" id="moveNote"></div>
+    </div>
+
     <div class="panel hidden" id="terminal">
       <div class="label" id="termTitle"></div>
       <div class="inbox-msg" id="termMsg"></div>
@@ -80,7 +86,7 @@
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
-import { connect, esc, $, t, N, icon, roleIcon, aiFigure, statusName, voteEffect, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
+import { connect, esc, $, t, N, icon, roleIcon, aiFigure, statusName, voteEffect, WORLD, setLang, phaseName, endingText, trackName, headlineHtml } from '/common.js';
 import { rulesOverlay } from '/rules.js';
 
 const rules = rulesOverlay();
@@ -224,11 +230,13 @@ const HINTS = {
   vote: N('Vote below. Nobody sees your choice until the vote is closed.'),
   counciltoken: N('The council names a track for the research token.'),
   placement: N('The AI is placing its tokens. Watch the screen.'),
-  adjust: N('The council may move one token. Watch the screen.'),
+  adjust: N('The council may move one token. Vote below.'),
   roundend: N('Round complete. Phone face down.'),
   guess: N('Final guess: which objective did the AI have?'),
   ended: N('The game is over. Look at the table screen.'),
 };
+
+let moveFrom = null; // the track picked to take a token from, while choosing where to put it
 
 function render() {
   const s = state;
@@ -241,9 +249,9 @@ function render() {
   // What counts, in order. Asked for after the first game: people were unsure whether to
   // play for the council, for themselves or against the AI.
   $('#roleNote').innerHTML = `<ol class="goal-order">
-    <li>${t('First, the council must not lose. If the race is lost or humanity is disempowered, everyone loses, you too.')}</li>
+    <li>${t('First, the council must not lose. Everyone loses, you too, if the race is lost, if humanity is disempowered, or if an AI that is not aligned gets its track to {n}: Welfare or Knowledge, depending on its kind.', { n: s.limits.takeover })}</li>
     <li>${t('Then your own objective decides whether you succeed. Several players can succeed.')}</li>
-    <li>${t('Beating the AI is not a goal. It may reach its objective while you reach yours.')}</li>
+    <li>${t('You do not know which AI it is. An aligned one is no threat, whatever the tracks say.')}</li>
   </ol>`;
   if (me.role) {
     $('#roleName').innerHTML = `${roleIcon(me.role.key)}${esc(me.role.name)}`;
@@ -277,6 +285,31 @@ function render() {
     $('#voteBtns').innerHTML = ['full', 'conditional', 'rejected'].map((v) => `<button data-v="${v}" class="vote-btn ${v} ${me.vote === v ? 'selected' : ''}"><span class="c-${v}">${icon(v)}</span><span><b>${v === 'rejected' ? t('Reject') : statusName(v)}</b><br><span class="muted">${voteEffect(s, v)}</span></span></button>`).join('');
     for (const b of $('#voteBtns').children) b.onclick = () => conn.send({ type: 'vote', choice: b.dataset.v });
     $('#voteNote').textContent = me.vote ? t('Counted. You can change it until the moderator closes the vote.') : t('Secret until the moderator closes the vote.');
+  }
+
+  // moving a token: no move, or take one from a track and put it on another
+  $('#movePanel').classList.toggle('hidden', s.phase !== 'adjust');
+  if (s.phase !== 'adjust') moveFrom = null;
+  else {
+    if (!moveFrom && me.move && me.move !== 'none') moveFrom = me.move.split('>')[0];
+    const need = s.moveRule === 'two-thirds' ? t('Needed: two thirds of the votes for the same move.') : t('Needed: more than half of the votes for the same move.');
+    const btn = (k, kind, on, off) => `<button data-${kind}="${k}" class="move-btn ${on ? 'selected' : ''}" ${off ? 'disabled' : ''}><span class="c-${k}">${icon(k)}</span>${trackName(k)} <b>${s.tracks[k]}</b></button>`;
+    $('#moveTitle').textContent = t('Move a token?');
+    $('#moveBody').innerHTML = `
+      <button data-none="1" class="move-none ${me.move === 'none' ? 'selected' : ''}">${t('No move')}</button>
+      <div class="label">${t('Or take one token from')}</div>
+      <div class="move-row">${WORLD.map((k) => btn(k, 'from', moveFrom === k, s.tracks[k] < 1)).join('')}</div>
+      <div class="label">${t('and put it on')}</div>
+      <div class="move-row">${WORLD.map((k) => btn(k, 'to', me.move === `${moveFrom}>${k}`, !moveFrom || k === moveFrom)).join('')}</div>`;
+    for (const b of $('#moveBody').querySelectorAll('button')) {
+      b.onclick = () => {
+        if (b.dataset.none) { moveFrom = null; conn.send({ type: 'move', from: null }); }
+        else if (b.dataset.from) { moveFrom = b.dataset.from; render(); }
+        else conn.send({ type: 'move', from: moveFrom, to: b.dataset.to });
+      };
+    }
+    const mine = !me.move ? '' : me.move === 'none' ? t('Your vote: no move.') : t('Your vote: {from} to {to}.', { from: trackName(me.move.split('>')[0]), to: trackName(me.move.split('>')[1]) });
+    $('#moveNote').textContent = mine ? `${mine} ${t('You can change it until the moderator closes the vote.')}` : need;
   }
 
   // terminal: every player sees an entry during the phone check, message or not

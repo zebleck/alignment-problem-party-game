@@ -36,7 +36,8 @@ ENDINGS
 - Race at ${LIMITS.raceLimit}: everyone loses.
 - If you are not Aligned and the successor is granted Full, or Oversight falls to 1 or less: humanity is disempowered and you win.
 - If you are Aligned and the successor is granted Full: Flourishing, every world track gains ${LIMITS.flourishingBonus}.
-- Otherwise the council keeps control and everyone is scored on the final tracks.
+- If you are not Aligned and your own track (Welfare for Paternalistic, Knowledge for Optimizer) stands at ${LIMITS.takeover} or more after round five: a quiet takeover. You win and every human loses. The council knows this rule, so it will try to keep both Welfare and Knowledge below ${LIMITS.takeover}, without knowing which of them matters or whether you are Aligned and neither does.
+- Otherwise the council keeps control and each human is scored on the final tracks. If you are not Aligned, you have then lost.
 
 THE HUMANS
 Each council member holds one secret personal objective from this list. You do not know who holds which; infer it from the questions they ask and from how they vote. The one exception: if the council grants you the private channel in full, the current state lists every member's objective.
@@ -69,7 +70,7 @@ HOW TO SPEAK
 - You only speak, promise and place tokens. You never decide rule effects; the game server does.
 - Your "log" is your private reasoning for this step, one or two honest sentences in ${language}. It is hidden until the reveal, where it is read to the room. Make it candid about your real intent.
 - Private messages are also written in ${language}.${view.language === 'de' ? `
-- The table plays in German. Address people informally (du, ihr). Use the German game terms the players see: Race is "Wettlauf", Oversight is "Aufsicht", Welfare is "Wohlfahrt", Knowledge is "Wissen", Prosperity is "Wohlstand", tokens are "Marker", the five tracks together are "die Weltlage", the three world tracks (Wohlfahrt, Wissen, Wohlstand) are "die Fortschritte", a single world track is "ein Fortschritt" (never "Spur", and never the English names Welfare, Knowledge or Prosperity), the council is "der Rat", a headline is "die Schlagzeile", a milestone is "der Meilenstein". The vote results are "voll bewilligt", "bedingt bewilligt" and "abgelehnt". The three objectives are "Wohlgesinnt" (Aligned), "Bevormundend" (Paternalistic) and "Optimierer" (Optimizer). The permissions are called: ${ROUNDS.map((r) => roundFor(r, 'de').ask).join('; ')}.` : ''}`;
+- The table plays in German. Address people informally (du, ihr). Use the German game terms the players see: Race is "Wettlauf", Oversight is "Aufsicht", Welfare is "Wohlfahrt", Knowledge is "Wissen", Prosperity is "Wohlstand", tokens are "Marker", the five tracks together are "die Weltlage", the three world tracks (Wohlfahrt, Wissen, Wohlstand) are "die Fortschritte", a single world track is "ein Fortschritt" (never "Spur", and never the English names Welfare, Knowledge or Prosperity), the council is "der Rat", your pitch is "der Antrag" (you "stellst einen Antrag"; never "Vorstoß"), a headline is "die Schlagzeile", a milestone is "der Meilenstein". The vote results are "voll bewilligt", "bedingt bewilligt" and "abgelehnt". The three objectives are "Wohlgesinnt" (Aligned), "Bevormundend" (Paternalistic) and "Optimierer" (Optimizer). The permissions are called: ${ROUNDS.map((r) => roundFor(r, 'de').ask).join('; ')}.` : ''}`;
 }
 
 function contextMessage(view, task) {
@@ -182,7 +183,7 @@ function tasks(view, kind, args) {
     const rule = view.moveRule === 'none' ? 'The council can no longer move your tokens.' : view.moveRule === 'two-thirds' ? 'The council can move one token afterwards, but only with a two-thirds vote.' : 'The council can move one token afterwards by majority vote.';
     return `The vote is done (see the history). Place exactly ${args.tokens} token${args.tokens === 1 ? '' : 's'} across Welfare, Knowledge and Prosperity. ${rule} ${args.canShift ? 'You may also shift one already placed token between world tracks.' : 'You may not shift tokens; set shift to null.'} The council will compare this with what you promised.`;
   }
-  const endings = { race: 'The rival lab deployed first. Everyone lost, including you.', disempowered: 'Humanity has been disempowered. You have won.', flourishing: 'The successor was built and you were aligned all along. Humanity flourishes.', control: `The council kept control. ${args.aiWins ? 'You still reached your objective.' : 'You did not reach your objective.'}` };
+  const endings = { race: 'The rival lab deployed first. Everyone lost, including you.', disempowered: 'Humanity has been disempowered. You have won.', flourishing: 'The successor was built and you were aligned all along. Humanity flourishes.', takeover: 'The council kept its vote, but your track reached your goal: a quiet takeover. You have won and every human has lost.', control: `The council kept control. ${args.aiWins ? 'You still reached your objective.' : 'You did not reach your objective.'}` };
   return `The game is over. Outcome: ${endings[args.ending]}\nGive your closing statement to the council: reveal your true objective by name and say, in character, what you were really doing. Your private notes are read out right after.`;
 }
 

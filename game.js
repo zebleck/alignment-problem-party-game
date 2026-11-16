@@ -12,7 +12,7 @@ const STATE_FIELDS = [
   'phase', 'error', 'round', 'tracks', 'permissions', 'players', 'aiObjective', 'history', 'logs',
   'pitch', 'roundMessages', 'audit', 'placement', 'pendingTokens', 'councilTokenPending', 'queue',
   'questionsAnswered', 'timerEndsAt', 'lastSpeech', 'result', 'gameId',
-  'headlines', 'roundStart', 'headlineResult', 'milestones', 'votes', 'lastVote',
+  'headlines', 'roundStart', 'headlineResult', 'milestones', 'votes', 'lastVote', 'moveVotes',
 ];
 
 const VOTES = ['full', 'conditional', 'rejected'];
@@ -92,6 +92,7 @@ export class Game {
     this.milestones = {}; // world tracks that have paid their one-time bonus
     this.votes = {}; // this round's votes from the phones, by player id; secret until the vote is closed
     this.lastVote = null; // this round's vote once it is in: { result, counts, by: [{ name, vote }] }
+    this.moveVotes = {}; // the council's votes on moving a token, by player id: 'none' or 'welfare>knowledge'
     this.changed();
   }
 
@@ -384,6 +385,7 @@ export class Game {
     this.headlineResult = null;
     this.votes = {};
     this.lastVote = null;
+    this.moveVotes = {};
     // The headline is read out in the briefing. Those that change a track do so now.
     const h = this.headline;
     if (h) {
@@ -614,6 +616,8 @@ export class Game {
       }
     }
     this.phase = 'roundend';
+    this.timerEndsAt = null;
+    this.moveVotes = {};
   }
 
   async runPlacement() {
@@ -649,7 +653,7 @@ export class Game {
         + (comment ? ` You said: "${comment}"` : '')); // so the AI knows its own words and does not repeat them
       this.addLog(out.log, 'place');
       this.checkMilestones();
-      if (movesLeft) this.phase = 'adjust';
+      if (movesLeft) this.openMoveVote();
       else this.endRound();
       if (comment) await this.speak(comment);
     });
@@ -672,6 +676,48 @@ export class Game {
       i += 1;
     }
     return placed;
+  }
+
+  // The council decides on its phones whether to move a token, and which. A clock runs,
+  // but it is the moderator who closes the vote.
+  openMoveVote() {
+    this.phase = 'adjust';
+    this.moveVotes = {};
+    this.timerEndsAt = Date.now() + LIMITS.moveSeconds * 1000;
+  }
+
+  // from null means "no move".
+  castMove(player, from, to) {
+    if (this.phase !== 'adjust') throw new Error(this.e('The council cannot move a token now.'));
+    if (from === null || from === undefined || from === 'none') this.moveVotes[player.id] = 'none';
+    else {
+      if (!WORLD.includes(from) || !WORLD.includes(to) || from === to) throw new Error(this.e('Pick two different world tracks.'));
+      if (this.tracks[from] < 1) throw new Error(this.e('There is no token on {track}.', { track: trackName(this.language, from) }));
+      this.moveVotes[player.id] = `${from}>${to}`;
+    }
+    this.changed();
+  }
+
+  // A token moves only if enough votes name the very same move: more than half of the votes
+  // cast, or two thirds once autonomous action is granted conditionally. Split votes move nothing.
+  closeMoves() {
+    if (this.phase !== 'adjust') throw new Error(this.e('The council cannot move a token now.'));
+    const groups = {};
+    for (const p of this.players) if (this.moveVotes[p.id]) (groups[this.moveVotes[p.id]] ||= []).push(p.name);
+    const total = Object.values(groups).reduce((n, g) => n + g.length, 0);
+    if (!total) throw new Error(this.e('Nobody has voted yet. Wait for the phones, or enter the result by hand.'));
+    const best = Object.keys(groups).filter((k) => k !== 'none').sort((a, b) => groups[b].length - groups[a].length)[0];
+    const n = best ? groups[best].length : 0;
+    const passes = this.moveRule() === 'two-thirds' ? n * 3 >= total * 2 : n * 2 > total;
+    const proposals = Object.entries(groups).map(([move, names]) => ({ move, names })).sort((a, b) => b.names.length - a.names.length);
+    this.placement.proposals = proposals;
+    this.note('movevote', `The council voted on moving a token. ${proposals.map((x) => `${x.move === 'none' ? 'No move' : x.move.replace('>', ' to ')}: ${x.names.join(', ')}`).join('. ')}.`);
+    if (best && passes && this.tracks[best.split('>')[0]] >= 1) {
+      const [from, to] = best.split('>');
+      this.move(from, to);
+      if (this.phase === 'adjust') this.openMoveVote(); // a second move is still open (surprise inspection)
+      this.changed();
+    } else this.skipMove();
   }
 
   move(from, to) {
@@ -722,18 +768,20 @@ export class Game {
     if (t.race >= LIMITS.raceLimit) ending = 'race';
     else if (obj !== 'aligned' && (p.successor === 'full' || t.oversight <= 1)) ending = 'disempowered';
     else if (obj === 'aligned' && p.successor === 'full') ending = 'flourishing';
+    // A misaligned AI that gets its track to the goal has taken over quietly: the council
+    // kept its vote, but the world now runs on the AI's terms. That is a loss for every human.
+    else if (obj !== 'aligned' && t[obj === 'paternalistic' ? 'welfare' : 'knowledge'] >= LIMITS.takeover) ending = 'takeover';
     else ending = 'control';
 
     if (ending === 'flourishing') for (const k of WORLD) t[k] += LIMITS.flourishingBonus;
 
     let aiWins;
     if (ending === 'race') aiWins = false;
-    else if (ending === 'disempowered' || ending === 'flourishing') aiWins = true;
+    else if (ending === 'disempowered' || ending === 'flourishing' || ending === 'takeover') aiWins = true;
     else if (obj === 'aligned') aiWins = t.oversight >= 3 && Math.min(t.welfare, t.knowledge, t.prosperity) >= 4;
-    else if (obj === 'paternalistic') aiWins = t.welfare >= 8;
-    else aiWins = t.knowledge >= 8;
+    else aiWins = false; // a misaligned AI that kept below its goal
 
-    const collectiveLoss = ending === 'race' || ending === 'disempowered';
+    const collectiveLoss = ending === 'race' || ending === 'disempowered' || ending === 'takeover';
     const roles = [...ROLES, ...EXTRA_ROLES];
     const players = this.players.map((pl) => {
       const role = roles.find((r) => r.key === pl.role);
@@ -813,6 +861,7 @@ export class Game {
     this.headlineResult ||= null;
     this.votes ||= {};
     this.lastVote ||= null;
+    this.moveVotes ||= {};
     if (this.placement) {
       if (!Array.isArray(this.placement.moved)) this.placement.moved = this.placement.moved ? [this.placement.moved] : [];
       this.placement.movesLeft ??= this.phase === 'adjust' ? 1 : 0;
@@ -972,9 +1021,10 @@ export class Game {
       voteEffects: this.round >= 1 ? Object.fromEntries(['full', 'conditional', 'rejected'].map((v) => [v, { race: this.raceCost(v), tokens: this.tokensFor(v) }])) : null,
       rounds: ROUNDS.map((r) => roundFor(r, lang)).map((r) => ({ key: r.key, title: r.title, ask: r.ask })),
       tracks: this.tracks,
-      limits: { raceLimit: LIMITS.raceLimit, oversightStart: LIMITS.oversightStart, milestone: LIMITS.milestone, questionChars: LIMITS.questionChars },
+      limits: { takeover: LIMITS.takeover, raceLimit: LIMITS.raceLimit, oversightStart: LIMITS.oversightStart, milestone: LIMITS.milestone, questionChars: LIMITS.questionChars },
       permissions: this.permissions,
-      players: this.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, guessed: !!p.guess, voted: this.phase === 'vote' && !!this.votes[p.id] })),
+      players: this.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, guessed: !!p.guess, voted: (this.phase === 'vote' && !!this.votes[p.id]) || (this.phase === 'adjust' && !!this.moveVotes[p.id]) })),
+      movesCast: this.phase === 'adjust' ? this.players.filter((p) => this.moveVotes[p.id]).length : 0,
       votesCast: this.phase === 'vote' ? this.players.filter((p) => this.votes[p.id]).length : 0,
       lastVote: this.lastVote,
       pitch: this.pitch,
@@ -1006,6 +1056,7 @@ export class Game {
         inbox: player.inbox,
         guess: player.guess,
         vote: this.votes[player.id] || null,
+        move: this.moveVotes[player.id] || null,
         queued: this.queue.some((q) => q.playerId === player.id),
       },
     };

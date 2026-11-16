@@ -50,7 +50,7 @@
 </div>
 
 <script type="module">
-import { connect, esc, $, t, icon, roleIcon, aiFigure, promiseLabel, askChip, votesHtml, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined, voteEffect, headlineHtml } from '/common.js';
+import { connect, esc, $, t, icon, roleIcon, aiFigure, promiseLabel, askChip, votesHtml, proposalsHtml, setLang, phaseName, endingText, timerText, chip, tracksHtml, placementHtml, trackName, playersJoined, voteEffect, headlineHtml } from '/common.js';
 import { rulesOverlay, setRulesTab } from '/rules.js';
 import { autoFit } from '/fit.js';
 
@@ -299,10 +299,10 @@ function mainHtml(s) {
     default: { // placement, adjust, roundend: the verdict and where the tokens went
       const verdict = s.permissions[r.key];
       const rule = s.phase !== 'adjust' ? '' : s.moveRule === 'two-thirds'
-        ? `<p><b>${t('Council: you may move one token, but it needs a two-thirds vote.')}</b></p>`
-        : `<p><b>${t('Council: you may move one token by majority vote.')}</b></p>`;
+        ? `<p><b>${t('Council: you may move one token, but it needs a two-thirds vote.')}</b> <span class="vote-count">${t('{n} of {total} have voted', { n: s.movesCast || 0, total: s.players.length })}</span></p>`
+        : `<p><b>${t('Council: you may move one token by majority vote.')}</b> <span class="vote-count">${t('{n} of {total} have voted', { n: s.movesCast || 0, total: s.players.length })}</span></p>`;
       return `<div class="panel verdict"><div class="label">${esc(r.ask)} · ${t('Result')}</div><div class="big">${chip(verdict)}</div>${votesHtml(s.lastVote)}
-        ${s.placement ? placementHtml(s.placement) : s.phase === 'roundend' ? `<p class="muted">${t('No tokens were placed this round.')}</p>` : ''}${rule}${headlineHtml(s)}</div>${ai('compact')}`;
+        ${s.placement ? placementHtml(s.placement) : s.phase === 'roundend' ? `<p class="muted">${t('No tokens were placed this round.')}</p>` : ''}${rule}${s.phase === 'roundend' ? proposalsHtml(s.placement?.proposals) : ''}${headlineHtml(s)}</div>${ai('compact')}`;
     }
   }
 }

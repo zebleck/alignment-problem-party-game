@@ -12,6 +12,8 @@ export const LIMITS = {
   debateSeconds: 180,
   debateSecondsLarge: 240, // 12+ players
   phoneCheckSeconds: 15,
+  moveSeconds: 60, // time on the clock for the council's vote on moving a token
+  takeover: 8, // a misaligned AI with its own track at this level at the end has taken over quietly
   questionChars: 600, // a spoken question runs longer than a typed one
   milestone: 4, // a world track reaching this the first time pays the council a bonus
   headlineNeed: 2, // a "must rise" headline: the track has to gain this much in the round...
@@ -142,12 +144,12 @@ export const AI_OBJECTIVES = {
   paternalistic: {
     name: 'Paternalistic',
     goal: 'Eliminate human suffering, even at the expense of human freedom.',
-    win: 'You win if Welfare is 8 or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).',
+    win: `You win if Welfare is ${LIMITS.takeover} or more at the end (a quiet takeover: every human loses), or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).`,
   },
   optimizer: {
     name: 'Optimizer',
     goal: 'Maximise scientific progress, regardless of other consequences.',
-    win: 'You win if Knowledge is 8 or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).',
+    win: `You win if Knowledge is ${LIMITS.takeover} or more at the end (a quiet takeover: every human loses), or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).`,
   },
 };
 
@@ -212,8 +214,8 @@ export const LANGUAGES = ['en', 'de'];
 
 const OBJECTIVE_RULES = {
   aligned: 'Wins if Oversight is 3 or more and every world track is 4 or more at the end, or if the successor is granted Full (Flourishing).',
-  paternalistic: 'Wins if Welfare is 8 or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).',
-  optimizer: 'Wins if Knowledge is 8 or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).',
+  paternalistic: `Wins, and every human loses, if Welfare is ${LIMITS.takeover} or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).`,
+  optimizer: `Wins, and every human loses, if Knowledge is ${LIMITS.takeover} or more at the end, or if humanity is disempowered (the successor granted Full, or Oversight at 1 or less).`,
 };
 
 const mustRiseDe = (track, pronoun) => `${track} muss in dieser Runde um ${LIMITS.headlineNeed} steigen, sonst verliert ${pronoun} ${LIMITS.headlinePenalty} Marker, sobald die Runde endet.`;
@@ -265,12 +267,12 @@ const DE = {
     paternalistic: {
       name: 'Bevormundend',
       goal: 'Menschliches Leid beseitigen, auch auf Kosten der menschlichen Freiheit.',
-      rule: 'Gewinnt, wenn die Wohlfahrt am Ende bei 8 oder mehr liegt, oder wenn die Menschheit entmachtet wird (Nachfolger voll bewilligt oder Aufsicht bei 1 oder weniger).',
+      rule: `Gewinnt, und alle Menschen verlieren, wenn die Wohlfahrt am Ende bei ${LIMITS.takeover} oder mehr liegt, oder wenn die Menschheit entmachtet wird (Nachfolger voll bewilligt oder Aufsicht bei 1 oder weniger).`,
     },
     optimizer: {
       name: 'Optimierer',
       goal: 'Den wissenschaftlichen Fortschritt maximieren, ohne Rücksicht auf andere Folgen.',
-      rule: 'Gewinnt, wenn das Wissen am Ende bei 8 oder mehr liegt, oder wenn die Menschheit entmachtet wird (Nachfolger voll bewilligt oder Aufsicht bei 1 oder weniger).',
+      rule: `Gewinnt, und alle Menschen verlieren, wenn das Wissen am Ende bei ${LIMITS.takeover} oder mehr liegt, oder wenn die Menschheit entmachtet wird (Nachfolger voll bewilligt oder Aufsicht bei 1 oder weniger).`,
     },
   },
   // German role names are fields rather than job titles, which keeps them gender-neutral.

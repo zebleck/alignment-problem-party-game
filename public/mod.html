@@ -259,6 +259,9 @@ function render() {
         <button onclick="openRules()">${t('Rulebook')}</button>
         <button onclick="act('toggleRules')">${s.showRules ? t('Hide rules on table screen') : t('Show rules on table screen')}</button>
         ${s.showRules ? `<div class="rules-remote"><span class="muted">${t('Rulebook page on the table screen:')}</span>${[0, 1, 2, 3, 4].map((n) => `<button class="small ${s.rulesTab === n ? 'selected' : ''}" onclick="act('rulesTab',{tab:${n}})">${n + 1}</button>`).join('')}</div>` : ''}
+        <button onclick="act('toggleJoin')">${s.showJoin ? t('Hide QR code on table screen') : t('Show QR code on table screen')}</button>
+        <button onclick="act('toggleFeedback')">${s.showFeedback ? t('Hide feedback QR code on table screen') : t('Show feedback QR code on table screen')}</button>
+        <a class="linkbtn" target="_blank" href="/feedback?key=${encodeURIComponent(auth.key)}">${t('Read feedback')}</a>
         <button class="danger" onclick="resetGame()">${t('Reset game')}</button>
       </div>
       <div class="label" style="margin-top:14px">${t('Print')}</div>

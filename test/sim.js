@@ -169,6 +169,27 @@ async function playDirect({ objective, votes, players = 8, move = false }) {
   await until(() => screen.state.showRules === true, 'moderator can show the rules on the table screen');
   act('toggleRules');
   await until(() => screen.state.showRules === false, 'and hide them again');
+  act('toggleJoin');
+  await until(() => screen.state.showJoin === true, 'moderator can show the join QR code on the table screen');
+  act('toggleJoin');
+  await until(() => screen.state.showJoin === false, 'and hide it again');
+
+  // Feedback form: its QR code replaces the join one, entries need a rating or text, only the moderator reads them.
+  act('toggleJoin');
+  act('toggleFeedback');
+  await until(() => screen.state.showFeedback === true && screen.state.showJoin === false, 'the feedback QR code replaces the join QR code');
+  act('toggleFeedback');
+  await until(() => screen.state.showFeedback === false, 'and can be hidden');
+  const sendFeedback = (body) => fetch(`${base}/api/feedback`, { method: 'POST', body: JSON.stringify(body) });
+  assert.equal((await sendFeedback({ rating: 9, text: '  ' })).status, 400);
+  assert.equal((await sendFeedback({ rating: 4, text: 'More rounds, please.', name: 'Anna' })).status, 200);
+  assert.deepEqual(await (await fetch(`${base}/api/feedback`)).json(), { language: 'en', voice: false });
+  assert.equal((await fetch(`${base}/api/feedback?key=wrong`)).status, 403);
+  const got = (await (await fetch(`${base}/api/feedback?key=test`)).json()).entries;
+  assert.equal(got.length, 1);
+  assert.deepEqual([got[0].rating, got[0].text, got[0].name], [4, 'More rounds, please.', 'Anna']);
+  assert.equal((await fetch(`${base}/api/feedback-audio`, { method: 'POST', body: 'x' })).status, 400);
+  assert.equal((await fetch(`${base}/feedback`)).status, 200);
 
   act('start');
   const votes = ['full', 'conditional', 'conditional', 'conditional', 'conditional'];

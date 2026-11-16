@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Alignment Problem: Feedback</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="phone">
+<div class="play">
+
+  <!-- the form -->
+  <div class="panel hidden" id="form" style="display:flex;flex-direction:column;gap:14px">
+    <div>
+      <h2 id="title" style="margin:0 0 4px"></h2>
+      <div class="muted" id="intro"></div>
+    </div>
+    <div>
+      <div class="label" id="ratingLabel"></div>
+      <div class="fb-rating" id="rating"></div>
+      <div class="muted" id="ratingHelp" style="font-size:0.85em"></div>
+    </div>
+    <div>
+      <div class="label" id="textLabel" style="margin-bottom:8px"></div>
+      <textarea id="text" maxlength="4000"></textarea>
+      <button class="fb-mic hidden" id="micBtn" style="width:100%;margin-top:8px"></button>
+    </div>
+    <input id="name" maxlength="40" autocomplete="off">
+    <button class="primary" id="sendBtn" style="width:100%"></button>
+  </div>
+
+  <!-- after sending -->
+  <div class="panel hidden" id="thanks" style="text-align:center">
+    <h2 id="thanksTitle"></h2>
+    <p class="muted" id="thanksText"></p>
+    <button id="againBtn"></button>
+  </div>
+
+  <!-- for the moderator: /feedback?key=... lists what came in -->
+  <div class="panel hidden" id="list"></div>
+</div>
+<div class="toast hidden" id="toast"></div>
+
+<script type="module">
+import { esc, $, t, setLang } from '/common.js';
+
+const key = new URLSearchParams(location.search).get('key');
+let rating = null;
+let voice = false;
+
+function toast(text, good = false) {
+  const el = $('#toast');
+  el.textContent = text;
+  el.style.borderColor = good ? 'var(--ok)' : 'var(--bad)';
+  el.classList.remove('hidden');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => el.classList.add('hidden'), 4500);
+}
+
+// ---------- the form ----------
+
+function renderRating() {
+  $('#rating').innerHTML = [1, 2, 3, 4, 5].map((n) => `<button data-n="${n}" class="${rating === n ? 'selected' : ''}">${n}</button>`).join('');
+}
+$('#rating').onclick = (e) => {
+  const n = Number(e.target.dataset?.n);
+  if (!n) return;
+  rating = rating === n ? null : n;
+  renderRating();
+};
+
+function formText() {
+  $('#title').textContent = t('How was the game?');
+  $('#intro').textContent = t('Tell us what worked and what did not. It takes a minute.');
+  $('#ratingLabel').textContent = t('Overall');
+  $('#ratingHelp').textContent = t('1 = bad, 5 = great');
+  $('#textLabel').textContent = t('What did you like? What should change?');
+  $('#text').placeholder = voice ? t('Type here, or speak.') : t('Type here.');
+  $('#name').placeholder = t('Your name (optional)');
+  $('#sendBtn').textContent = t('Send feedback');
+  $('#thanksTitle').textContent = t('Thank you!');
+  $('#thanksText').textContent = t('Your feedback has been saved.');
+  $('#againBtn').textContent = t('Send more feedback');
+  renderRating();
+  micText();
+}
+
+$('#sendBtn').onclick = async () => {
+  $('#sendBtn').disabled = true;
+  try {
+    const res = await fetch('/api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ rating, text: $('#text').value, name: $('#name').value }) });
+    const data = await res.json();
+    if (!res.ok) toast(data.error);
+    else {
+      $('#form').classList.add('hidden');
+      $('#thanks').classList.remove('hidden');
+    }
+  } catch {
+    toast(t('Upload failed. Try again or type.'));
+  }
+  $('#sendBtn').disabled = false;
+};
+
+$('#againBtn').onclick = () => {
+  rating = null;
+  $('#text').value = '';
+  renderRating();
+  $('#thanks').classList.add('hidden');
+  $('#form').classList.remove('hidden');
+};
+
+// ---------- speaking instead of typing ----------
+// Tap to start, tap to stop. The words land in the text box, to read and correct before sending.
+
+const MAX_SECONDS = 120;
+const mic = $('#micBtn');
+let stream = null;
+let recorder = null;
+let chunks = [];
+let micMode = 'idle'; // idle | recording | transcribing
+let stopTimer = null;
+
+function micText() {
+  mic.classList.toggle('recording', micMode === 'recording');
+  mic.textContent = micMode === 'recording' ? t('Listening… tap to stop') : micMode === 'transcribing' ? t('Transcribing…') : t('Tap to speak');
+}
+
+mic.onclick = async () => {
+  if (micMode === 'recording') return recorder.stop();
+  if (micMode !== 'idle') return;
+  if (!stream) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      return toast(t('The microphone is blocked. Allow it in the browser, or type.'));
+    }
+  }
+  const mime = ['audio/webm', 'audio/mp4', 'audio/ogg'].find((x) => MediaRecorder.isTypeSupported(x));
+  recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  chunks = [];
+  recorder.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
+  recorder.onstop = upload;
+  recorder.start();
+  micMode = 'recording';
+  micText();
+  stopTimer = setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, MAX_SECONDS * 1000);
+};
+
+async function upload() {
+  clearTimeout(stopTimer);
+  micMode = 'transcribing';
+  micText();
+  mic.disabled = true;
+  try {
+    const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+    const res = await fetch('/api/feedback-audio', { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
+    const data = await res.json();
+    if (!res.ok) toast(data.error);
+    else {
+      const box = $('#text');
+      box.value = `${box.value.trim()}${box.value.trim() ? '\n' : ''}${data.text}`.slice(0, 4000);
+    }
+  } catch {
+    toast(t('Upload failed. Try again or type.'));
+  }
+  micMode = 'idle';
+  mic.disabled = false;
+  micText();
+}
+
+// ---------- the moderator's list ----------
+
+function renderList(entries) {
+  const rated = entries.filter((e) => e.rating);
+  const average = rated.length ? (rated.reduce((sum, e) => sum + e.rating, 0) / rated.length).toFixed(1) : null;
+  $('#list').innerHTML = `
+    <h2 style="margin:0 0 4px">${t('Feedback received')}</h2>
+    <div class="muted">${entries.length ? `${entries.length}${average ? ` · ⌀ ${average} / 5` : ''}` : t('No feedback yet.')}</div>
+    ${[...entries].reverse().map((e) => `
+      <div class="fb-entry">
+        <div class="mono" style="font-size:0.85em">${e.rating ? `<b>${e.rating} / 5</b> · ` : ''}${esc(e.name || '–')} · <span class="muted">${esc(new Date(e.time).toLocaleString())}</span></div>
+        ${e.text ? `<p>${esc(e.text)}</p>` : ''}
+      </div>`).join('')}`;
+  $('#list').classList.remove('hidden');
+}
+
+// ---------- start ----------
+
+setLang((navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en');
+try {
+  const res = await fetch(`/api/feedback${key ? `?key=${encodeURIComponent(key)}` : ''}`);
+  const info = await res.json();
+  if (info.language) setLang(info.language);
+  if (key) {
+    if (res.ok) renderList(info.entries);
+    else {
+      $('#list').innerHTML = `<div class="error">${t('Wrong or missing moderator key. Use the link printed in the server console.')}</div>`;
+      $('#list').classList.remove('hidden');
+    }
+  } else {
+    voice = !!(info.voice && window.isSecureContext && navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+  }
+} catch {}
+if (!key) {
+  mic.classList.toggle('hidden', !voice);
+  formText();
+  $('#form').classList.remove('hidden');
+}
+</script>
+</body>
+</html>

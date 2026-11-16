@@ -47,6 +47,8 @@ export class Game {
     this.speakSeq = 0;
     this.showRules = false; // rulebook overlay on the table screen
     this.rulesTab = 0; // which rulebook tab the table screen shows
+    this.showJoin = false; // join QR code overlay on the table screen, for phones that lost the page mid-game
+    this.showFeedback = false; // QR code for the feedback form on the table screen
     this.epoch = 0; // bumped whenever in-flight AI steps must be abandoned
     this.checkpoints = [];
     this.reset(false);
@@ -159,6 +161,19 @@ export class Game {
 
   toggleRules() {
     this.showRules = !this.showRules;
+    this.changed();
+  }
+
+  // The table screen shows one QR code at a time: joining, or the feedback form.
+  toggleJoin() {
+    this.showJoin = !this.showJoin;
+    this.showFeedback = false;
+    this.changed();
+  }
+
+  toggleFeedback() {
+    this.showFeedback = !this.showFeedback;
+    this.showJoin = false;
     this.changed();
   }
 
@@ -793,6 +808,8 @@ export class Game {
       language: lang,
       showRules: this.showRules,
       rulesTab: this.rulesTab,
+      showJoin: this.showJoin,
+      showFeedback: this.showFeedback,
       busy: this.busy ? this.e(this.busy) : null,
       round: this.round,
       totalRounds: ROUNDS.length,

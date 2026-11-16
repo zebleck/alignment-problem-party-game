@@ -18,6 +18,14 @@
     <button class="primary" id="soundBtn"></button>
   </div>
 </div>
+<div class="overlay join-overlay hidden" id="joinOverlay">
+  <div class="panel" style="text-align:center">
+    <div class="label" id="joinLabel"></div>
+    <div class="qr" id="joinQr"></div>
+    <div class="join-url" id="joinUrl"></div>
+    <p class="muted" id="joinHint"></p>
+  </div>
+</div>
 
 <div class="screen">
   <header>
@@ -26,6 +34,8 @@
     <div style="display:flex;align-items:center;gap:14px">
       <button class="rules-btn hidden" id="speakerBtn"></button>
       <button class="rules-btn" id="rulesBtn"></button>
+      <button class="rules-btn" id="joinBtn"></button>
+      <button class="rules-btn" id="feedbackBtn"></button>
       <button class="rules-btn hidden" id="fullBtn"></button>
       <button class="rules-btn" id="reloadBtn"></button>
       <div id="timer" class="timer"></div>
@@ -53,6 +63,29 @@ const rules = rulesOverlay();
 let rulesFromMod = false;
 let rulesTabFromMod = 0; // the moderator can turn the pages of the rulebook shown here
 $('#rulesBtn').onclick = () => rules.toggle();
+
+// A large QR code over the screen: 'join' for phones that lost the page mid-game,
+// 'feedback' for the feedback form. Opens from the buttons here, or when the
+// moderator shows it. A click anywhere closes it.
+let qrFromMod = null;
+function showQr(mode) {
+  const on = !!mode;
+  const url = `${location.origin}/${mode === 'feedback' ? 'feedback' : 'play'}`;
+  $('#joinLabel').textContent = mode === 'feedback' ? t('Give feedback') : t('Join on your phone');
+  if (on && window.qrcode) {
+    try {
+      const q = window.qrcode(0, 'M');
+      q.addData(url);
+      q.make();
+      $('#joinQr').innerHTML = q.createSvgTag(6, 2);
+    } catch {}
+  }
+  $('#joinUrl').textContent = url;
+  $('#joinOverlay').classList.toggle('hidden', !on);
+}
+$('#joinBtn').onclick = () => showQr('join');
+$('#feedbackBtn').onclick = () => showQr('feedback');
+$('#joinOverlay').onclick = () => showQr(null);
 
 // Reload button: for a screen that got stuck, without needing a keyboard.
 $('#reloadBtn').onclick = () => location.reload();
@@ -84,6 +117,9 @@ function staticText() {
   $('#ovText').textContent = t('Put this window on the TV or projector. The AI speaks through this device.');
   $('#soundBtn').textContent = t('Turn sound on');
   $('#rulesBtn').textContent = t('Rules');
+  $('#joinBtn').textContent = t('QR code');
+  $('#feedbackBtn').textContent = t('Feedback');
+  $('#joinHint').textContent = t('Tap anywhere to close.');
   $('#fullBtn').textContent = fsActive() ? t('Exit fullscreen') : t('Fullscreen');
   $('#reloadBtn').textContent = t('Reload');
   $('#speakerBtn').textContent = t('Sound is on another screen · play it here');
@@ -338,6 +374,11 @@ const conn = connect({ role: 'screen' }, {
     if (state.showRules !== rulesFromMod) {
       rulesFromMod = state.showRules;
       rules.set(rulesFromMod);
+    }
+    const qrMod = state.showFeedback ? 'feedback' : state.showJoin ? 'join' : null;
+    if (qrMod !== qrFromMod) {
+      qrFromMod = qrMod;
+      showQr(qrMod);
     }
     render();
   },

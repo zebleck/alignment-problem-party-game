@@ -58,7 +58,14 @@ function transcript(rec) {
 }
 
 // gamesDir: where a record of every game is kept (omit to keep none).
-export function createApp(env = process.env, { stateFile = null, keyFile = null, gamesDir = null } = {}) {
+// feedbackFile: where feedback from the form at /feedback is kept, one JSON entry per line (omit to keep it in memory only).
+export function createApp(env = process.env, { stateFile = null, keyFile = null, gamesDir = null, feedbackFile = null } = {}) {
+  const feedback = [];
+  if (feedbackFile && fs.existsSync(feedbackFile)) {
+    for (const line of fs.readFileSync(feedbackFile, 'utf8').split('\n')) {
+      try { if (line.trim()) feedback.push(JSON.parse(line)); } catch {}
+    }
+  }
   // The moderator key: fixed by MOD_KEY in .env, else remembered in keyFile,
   // else created once. It only changes when the moderator asks for a new one.
   const newKey = () => crypto.randomBytes(4).toString('hex');
@@ -237,8 +244,16 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
             roles: ALL_ROLES.map((r) => roleFor(r.key, lang)),
           });
         }
+        if (url.pathname === '/api/feedback') {
+          // With the moderator key: everything received so far. Without: what the form needs to know.
+          if (url.searchParams.has('key')) {
+            if (url.searchParams.get('key') !== modKey) return json(res, 403, { error: 'Wrong key.' });
+            return json(res, 200, { language: game.language, entries: feedback });
+          }
+          return json(res, 200, { language: game.language, voice: !!speech.sttEnabled });
+        }
         let file = url.pathname;
-        if (['/screen', '/mod', '/play', '/rules', '/dev', '/cards', '/cheatsheet'].includes(file)) file += '.html';
+        if (['/screen', '/mod', '/play', '/rules', '/dev', '/cards', '/cheatsheet', '/feedback'].includes(file)) file += '.html';
         const full = path.normalize(path.join(PUBLIC, file));
         if (!full.startsWith(PUBLIC + path.sep) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
           return json(res, 404, { error: 'Not found.' });
@@ -263,6 +278,36 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
         const text = await speech.stt(audio, req.headers['content-type'] || 'audio/webm');
         if (!text) return json(res, 400, { error: game.e('I could not hear anything. Try again or type.') });
         game.ask(player, text);
+        return json(res, 200, { text });
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/feedback') {
+        const body = JSON.parse((await readBody(req, 20_000)).toString('utf8') || '{}');
+        const rating = Math.round(Number(body.rating));
+        const entry = {
+          time: new Date().toISOString(),
+          gameId: game.gameId,
+          language: game.language,
+          rating: rating >= 1 && rating <= 5 ? rating : null,
+          text: String(body.text || '').trim().slice(0, 4000),
+          name: String(body.name || '').trim().replace(/\s+/g, ' ').slice(0, 40),
+        };
+        if (!entry.rating && !entry.text) throw new Error(game.e('Please give a rating or write something.'));
+        feedback.push(entry);
+        if (feedbackFile) {
+          fs.mkdirSync(path.dirname(feedbackFile), { recursive: true });
+          fs.appendFileSync(feedbackFile, `${JSON.stringify(entry)}\n`);
+        }
+        return json(res, 200, { ok: true });
+      }
+
+      // Spoken feedback: transcribed and sent back, so the person can read it before sending.
+      if (req.method === 'POST' && url.pathname === '/api/feedback-audio') {
+        if (!speech.sttEnabled) return json(res, 400, { error: game.e('Voice input needs an ElevenLabs key. Please type.') });
+        const audio = await readBody(req, 6_000_000);
+        if (audio.length < 1500) return json(res, 400, { error: game.e('That was too short. Try again or type.') });
+        const text = await speech.stt(audio, req.headers['content-type'] || 'audio/webm');
+        if (!text) return json(res, 400, { error: game.e('I could not hear anything. Try again or type.') });
         return json(res, 200, { text });
       }
 
@@ -294,6 +339,8 @@ export function createApp(env = process.env, { stateFile = null, keyFile = null,
     dropQuestion: (m) => game.dropQuestion(Number(m.index)),
     toggleRules: () => game.toggleRules(),
     rulesTab: (m) => game.setRulesTab(m.tab),
+    toggleJoin: () => game.toggleJoin(),
+    toggleFeedback: () => game.toggleFeedback(),
     setLanguage: (m) => game.setLanguage(m.language),
     testVoice: () => game.testVoice(),
     clearError: () => { game.error = null; game.changed(); },
@@ -384,7 +431,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   loadEnv();
   const stateFile = path.join(ROOT, 'data', 'game-state.json');
   if (process.argv.includes('--fresh') && fs.existsSync(stateFile)) fs.rmSync(stateFile);
-  const app = createApp(process.env, { stateFile, keyFile: path.join(ROOT, 'data', 'moderator-key.txt'), gamesDir: path.join(ROOT, 'data', 'games') });
+  const app = createApp(process.env, { stateFile, keyFile: path.join(ROOT, 'data', 'moderator-key.txt'), gamesDir: path.join(ROOT, 'data', 'games'), feedbackFile: path.join(ROOT, 'data', 'feedback.jsonl') });
   await app.ready;
   const port = Number(process.env.PORT) || 3000;
   app.server.listen(port, () => {
@@ -395,6 +442,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`  Moderator:     http://localhost:${port}/mod?key=${app.modKey}`);
     console.log(`  Players:       http://localhost:${port}/play`);
     console.log(`  Rulebook:      http://localhost:${port}/rules`);
+    console.log(`  Feedback:      http://localhost:${port}/feedback   (read it at /feedback?key=${app.modKey})`);
     console.log(`  Solo test:     http://localhost:${port}/dev?key=${app.modKey}   (all views and 4 players in one tab)\n`);
     console.log(`  AI:    ${app.ai.mode}`);
     console.log(`  Voice: ${app.speech.ttsEnabled ? 'ElevenLabs' : 'browser voice, typed questions only (no ElevenLabs key)'}\n`);

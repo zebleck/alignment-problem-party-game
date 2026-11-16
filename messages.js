@@ -53,6 +53,9 @@ const DE = {
   'I could not hear anything. Try again or type.': 'Ich habe nichts verstanden. Versuch es noch einmal oder tippe.',
   'Voice questions need an ElevenLabs key. Please type your question.': 'Für Sprachfragen fehlt ein ElevenLabs-Schlüssel. Bitte tippe deine Frage.',
   'Unknown action.': 'Unbekannte Aktion.',
+  'Please give a rating or write something.': 'Bitte gib eine Bewertung ab oder schreib etwas.',
+  'Voice input needs an ElevenLabs key. Please type.': 'Für die Spracheingabe fehlt ein ElevenLabs-Schlüssel. Bitte tippe.',
+  'That was too short. Try again or type.': 'Das war zu kurz. Versuch es noch einmal oder tippe.',
   'The moderator key is set in .env (MOD_KEY) and cannot be changed here.': 'Der Schlüssel der Spielleitung ist in der .env festgelegt (MOD_KEY) und lässt sich hier nicht ändern.',
   'Not found.': 'Nicht gefunden.',
 };
